@@ -1,6 +1,23 @@
-## Setup (Python 3.11)
+# Flu Model Calibration
+
+This repository contains code for calibrating MetroFluSim models using the CLT Toolkit and PyTorch-based optimization.
+
+The code is intended to be run locally in Python 3.11 using VS Code or a standard terminal.
+
+---
+
+## Requirements
+
+- Python 3.11
+- pip
+- git
+
+---
+
+## Setup (local machine)
+
+Clone this repository:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+git clone https://github.com/paul821/clt-calibration-pipeline/
+cd clt-calibration-pipeline
