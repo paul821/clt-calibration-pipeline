@@ -1,0 +1,27 @@
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# venv
+.venv/
+venv/
+
+# vscode
+.vscode/
+
+# outputs / data artifacts
+outputs/
+runs/
+*.pt
+*.pth
+*.pkl
+*.csv
+*.parquet
+
+# mac/windows
+.DS_Store
+Thumbs.db
