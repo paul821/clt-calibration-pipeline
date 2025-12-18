@@ -148,8 +148,8 @@ def apply_theta_to_model(theta_input, config, structure, base_state, base_params
     # Respect fixed-parameter modes (used by IHR 2-stage)
     if config.get("hold_beta_fixed", False) and (config.get("fixed_beta_tensor", None) is not None):
         params.beta_baseline = config["fixed_beta_tensor"]
-
-    params.beta_baseline = beta_tensor
+    else:
+        params.beta_baseline = beta_tensor
     # Optional IHR estimation (unless held fixed)
     if config.get("hold_ihr_fixed", False) and (config.get("fixed_ihr_tensor", None) is not None):
         params.ihr_baseline = config["fixed_ihr_tensor"]
@@ -1215,6 +1215,7 @@ def run_metapop_calibration_suite(
             local_config[k] = v
 
     local_structure = build_theta_structure(local_config, base_state, base_params)
+    observed_window = true_admits_history[start_step:start_step + n_steps]
     # IHR mode uses a 2-stage calibration:
     #   Stage 1: estimate beta only (hold IHR fixed)
     #   Stage 2: estimate IHR only (hold beta fixed at stage-1 optimum)
@@ -1288,7 +1289,7 @@ def run_metapop_calibration_suite(
     start_step = int(t0_day * steps_per_day)
     n_steps = int(window_days * steps_per_day)
 
-    observed_window = true_admits_history[start_step:start_step + n_steps]
+    
     # IHR mode: aggregate observed truth over age (and risk) => per-location (T x L)
     if local_config.get("ihr_mode", False) and local_config.get("ihr_aggregate_over_age", True):
         # expected dims: (time, L, A, R) or similar; sum over A and R
