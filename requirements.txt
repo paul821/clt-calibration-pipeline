@@ -1,1 +1,6 @@
-
+torch
+numpy
+pandas
+matplotlib
+scipy
+sciris
