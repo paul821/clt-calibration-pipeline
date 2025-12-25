@@ -1,4 +1,5 @@
-
+import matplotlib
+import numpy as np
 
 def save_convergence_plot(grid_results):
     """Surgical Edit 92/93: SSE vs Offset Visualization with Global R2"""
