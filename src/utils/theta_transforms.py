@@ -2,7 +2,7 @@
 import torch
 import copy
 
-# Migrate entire functions:
+# Lines 197-207: build_gss_theta_structure
 def build_gss_theta_structure(config, base_state, base_params):
     L, A, R = base_params.beta_baseline.shape
     slices = {}; idx = 0
@@ -12,7 +12,8 @@ def build_gss_theta_structure(config, base_state, base_params):
             n_comp = getattr(base_state, comp_name).numel()
             slices[f"init_{comp_name}"] = slice(idx, idx + n_comp); idx += n_comp
     return {"slices": slices, "size": idx}
-  
+
+# Lines 209-218: apply_gss_theta
 def apply_gss_theta(theta, config, structure, base_state, base_params):
     L, A, R = base_params.beta_baseline.shape
     slices = structure["slices"]
@@ -22,7 +23,8 @@ def apply_gss_theta(theta, config, structure, base_state, base_params):
     if "init_E" in slices:
         init_state.E = torch.exp(theta[slices["init_E"]]).view_as(init_state.E).double()
     return init_state, params
-  
+
+# Lines 220-223: apply_ihr_theta
 def apply_ihr_theta(theta, base_params):
     params = copy.deepcopy(base_params)
     params.IP_to_ISH_prop = torch.as_tensor(theta, dtype=torch.float64).view(3, 5, 1).contiguous()
