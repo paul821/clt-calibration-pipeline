@@ -1,93 +1,64 @@
-# Flu Model Calibration
+# CLT Calibration Pipeline
 
-This repository contains code for calibrating MetroFluSim models using the CLT Toolkit and PyTorch-based optimization.
+A modular calibration framework for the CLT_BaseModel using multi-stage parameter estimation with Golden Section Search and L-BFGS-B optimization.
 
-The code is intended to be run locally in Python 3.11 using VS Code or a standard terminal.
+## Features
 
----
+- **Stage 1**: Transmission rate (β) and initial seeding (E₀) calibration with temporal offset discovery
+- **Stage 2**: Infection-hospitalization ratio (IHR) calibration across age-stratified populations
+- **Golden Section Search**: Automatic epidemic start date discovery
+- **Stochastic Truth Anchoring**: Realistic Poisson-noised synthetic data
+- **Regularization**: Structural penalties to prevent shadow solutions
 
-## Requirements
-
-- Python 3.11
-- pip
-- git
-
----
-
-## Setup (local machine)
-
-Clone this repository:
-
+## Installation
 ```bash
-git clone https://github.com/paul821/clt-calibration-pipeline/
+git clone https://github.com/yourusername/clt-calibration-pipeline.git
 cd clt-calibration-pipeline
-
+pip install -e .
 ```
----
 
-### MAJOR MODIFICATIONS:
-1. TEMPORAL RESCALING:
-   - Transition rates (E->I, I->H, etc.) scaled by 'time_stretch' (5.0).
-   - Purpose: Elongates epidemic peaks 
+## Quick Start
+```python
+from config.calibration_config import CalibrationConfig
+from config.model_config import ModelConfig
+from scripts.run_calibration import run_calibration
 
-2. LOG-SPACE PARAMETERIZATION:
-   - Parameters (beta, E0) optimized as exponents: theta = log(param).
-   - Purpose: Guarantees parameter positivity and improves L-BFGS-B 
-     convergence across disparate magnitudes.
+# Configure calibration
+calib_config = CalibrationConfig(mode="SEQUENTIAL")
+model_config = ModelConfig()
 
-3. RESTRUCTURED REGIONAL LOSS:
-   - Shifted from global tensor MSE to a sum of raw regional 
-     squared-error (SSE) terms.
-   - Purpose: Provides a high-fidelity objective function that 
-     captures regional dynamics while remaining unweighted to 
-     reflect raw hospitalizations volumes.
+# Run
+final_state, final_params, predictions = run_calibration(calib_config, model_config)
+```
 
-4. E0 STRUCTURAL REGULARIZATION:
-   - L2 penalty (lambda=10.0) applied to initial infected states.
-   - Target: Constrains E0 to specific age groups (Age Index 2) 
-     per REG_CONFIG targets.
-   - Purpose: Resolves 'Shadow Solutions' where the model fits the 
-     curve but misassigns starting population demographics.
+## Project Structure
+```
+clt-calibration-pipeline/
+├── config/              # Configuration dataclasses
+├── src/
+│   ├── optimization/    # Stage 1 (GSS) and Stage 2 (IHR) optimizers
+│   ├── utils/          # Parameter transforms and metrics
+│   └── visualization/   # Plotting utilities
+├── scripts/            # Main execution scripts
+└── examples/           # Usage examples
+```
 
-5. STOCHASTIC TRUTH ANCHORING:
-   - Truth data injected with IID Poisson noise: N ~ Poisson(Lambda).
-   - This is now done at the Location-Age resolution and aggregated for Stage 1.
-   - Purpose: Provides a realistic, 'rough' landscape that prevents 
-     parameter smearing and tests recovery against stochasticity.
+## Configuration
 
-6. OPTIMIZATION HYPERPARAMETERS:
-   - Algorithm: L-BFGS-B (Stage 1 & 2).
-   - Tolerances: ftol=1e-7, gtol=1e-4. Randomly, one has maxiter and the other does not. No reason.
-   - Purpose: Early termination upon reaching the noise floor, 
-     preventing over-fitting to stochastic fluctuations.
+### Calibration Modes
 
-7. GOLDEN SECTION SEARCH (GSS) OFFSET DISCOVERY:
-   - Mechanism: Iterative interval reduction search for temporal 
-     shift (Delta) within a [-30, 15] day window. This can we changed to 
-     (say) [-1,1] for quicker run.
-   - Logic: Each 'probe' executes a full L-BFGS-B optimization 
-     to find the minimum SSE SUM (Objective) at that offset.
-   - Purpose: Decouples the epidemic 'Start Date' from the 
-     Transmission Rate (Beta), resolving temporal phase-shift errors.
-     In reality we do not know when infections start. This aims to mimic
-     that reality. 
+- `BETA_ONLY`: Stage 1 only (transmission + seeding)
+- `IHR_ONLY`: Stage 2 only (hospitalization rates)
+- `SEQUENTIAL`: Full two-stage pipeline
 
-8. MULTI-STAGE PARAMETER DECOUPLING:
-   - Structure: Stage 1 (Transmission/Seeding) -> Stage 2 (IHR).
-   - Constraint: Stage 1 results (Beta, E0, Offset) are frozen when we 
-     get to stage 2
-   - Purpose: The idea is to get regional hospitalizations correct at first
-     and then try to get age-specific results correct while avoiding the
-     identifiability issues that come with fitting beta and IHR at the same time. 
+### Key Parameters
+```python
+CalibrationConfig(
+    T=180,                    # Simulation days
+    timesteps_per_day=4,      # Temporal resolution
+    mode="SEQUENTIAL",        # Calibration mode
+    gss_tolerance=1.0,        # GSS convergence threshold
+    verbose_lbfgs=False       # Iteration-level logging
+)
+```
 
-9. 15-CHANNEL CLINICAL CALIBRATION (IHR):
-   - Mechanism: Optimization across 15 independent IHR values 
-     (3 regions x 5 age groups). This is stage 2. 
-   - Purpose: Recovers the probability of hospitalization per 
-     infected individual across disparate demographic subpopulations.
-
-10. NEIGHBORHOOD WARM-STARTING:
-    - Mechanism: GSS probes are initialized using the optimal theta 
-      vector from the nearest previously calculated offset.
-    - Purpose: Drastically reduces convergence time and ensures 
-      stability across the GSS search landscape.
