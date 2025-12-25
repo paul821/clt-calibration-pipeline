@@ -7,7 +7,6 @@ import copy
 import warnings  # Line 30!
 
 # Import flu_core after environment setup
-import flu_core as flu
 
 from ..utils.theta_transforms import build_gss_theta_structure, apply_gss_theta
 from ..utils.metrics import format_iter_report
@@ -27,6 +26,7 @@ class GSSOptimizer:
         """
         Lines 282-381: Complete GSS Stage
         """
+        import flu_core as flu
         # Lines 283-285
         struct = build_gss_theta_structure(self.estimation_config, base_state, base_params)
         grid_results = []

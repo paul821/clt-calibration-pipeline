@@ -11,6 +11,8 @@ class ModelConfig:
     texas_input_path: Optional[Path] = None
     calibration_input_path: Optional[Path] = None
     
+    timesteps_per_day: int = 4
+    
     # Subpopulation names and beta values (from lines 418-419)
     subpop_names: list = None
     beta_values: list = None

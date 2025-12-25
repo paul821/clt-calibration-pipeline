@@ -25,3 +25,39 @@ runs/
 # mac/windows
 .DS_Store
 Thumbs.db
+
+# Create/update .gitignore
+cat > .gitignore << 'EOF'
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# External dependencies (cloned automatically)
+CLT_BaseModel/
+
+# Output files
+*.png
+*.pdf
+*.csv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+EOFCLT_BaseModel/

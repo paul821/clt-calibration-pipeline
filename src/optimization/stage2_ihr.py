@@ -2,8 +2,6 @@
 import torch
 import numpy as np
 from scipy.optimize import minimize
-import clt_toolkit as clt
-import flu_core as flu
 
 from ..utils.theta_transforms import apply_ihr_theta
 from ..utils.metrics import format_iter_report
@@ -20,6 +18,8 @@ class IHROptimizer:
         """
         Lines 383-404: Complete IHR Stage
         """
+        import clt_toolkit as clt
+        import flu_core as flu
         # Lines 384-385
         x0, iter_tracker = params_in.IP_to_ISH_prop.detach().numpy().flatten(), [0]
         subpop_truths_15ch = [truth_15ch[:, i].sum(dim=(1, 2)) for i in range(3)]
