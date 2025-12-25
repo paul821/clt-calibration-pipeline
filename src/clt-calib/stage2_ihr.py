@@ -1,4 +1,5 @@
-
+import torch
+import scipy.optimize
 def apply_ihr_theta(theta, base_params):
     params = copy.deepcopy(base_params)
     params.IP_to_ISH_prop = torch.as_tensor(theta, dtype=torch.float64).view(3, 5, 1).contiguous()
