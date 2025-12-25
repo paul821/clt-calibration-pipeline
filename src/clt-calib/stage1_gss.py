@@ -1,4 +1,6 @@
-
+import torch
+import numpy as np
+import scipy.optimize 
 def build_gss_theta_structure(config, base_state, base_params):
     L, A, R = base_params.beta_baseline.shape
     slices = {}; idx = 0
