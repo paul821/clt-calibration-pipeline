@@ -24,6 +24,8 @@ from src.visualization.plotting import save_diagnostic_plots, save_regional_aggr
 # Setup environment (line 30)
 setup_environment()
 
+warnings.filterwarnings("ignore", category=UserWarning, message=".*To copy construct from a tensor.*")
+
 # Now import CLT after environment setup
 import clt_toolkit as clt
 import flu_core as flu
