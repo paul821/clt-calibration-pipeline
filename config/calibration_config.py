@@ -6,28 +6,34 @@ from typing import Dict, List
 class CalibrationConfig:
     """Configuration for calibration parameters"""
     
-    # From lines 27-29
+    # Lines 27-29
     T: int = 180
     timesteps_per_day: int = 4
     
-    # From lines 32-34
-    mode: str = "SEQUENTIAL"  # Options: "BETA_ONLY", "IHR_ONLY", "SEQUENTIAL"
-    calibration_method: str = "L-BFGS-B"
-    gss_tolerance: float = 1.0
-    verbose_lbfgs: bool = False
-    
-    # From lines 36
-    age_labels: List[str] = None
-    
-    # From lines 38-41
-    estimation_config: Dict = None
-    
-    # From lines 43-48
-    reg_config: Dict = None
-    
-    # From lines 407-408 (random seeds)
+    # Lines 31-32 - MISSED THESE!
     torch_seed: int = 0
     numpy_seed: int = 0
+    
+    # Lines 34 (not 32-34 as I said)
+    mode: str = "SEQUENTIAL"  # "BETA_ONLY", "IHR_ONLY", "SEQUENTIAL"
+    
+    # Line 35
+    calibration_method: str = "L-BFGS-B"
+    
+    # Line 36
+    gss_tolerance: float = 1.0
+    
+    # Line 37 - THIS IS CRITICAL!
+    verbose_lbfgs: bool = False  # Surgical Edit: Gating flag for all iteration outputs
+    
+    # Line 39
+    age_labels: List[str] = None
+    
+    # Lines 41-44
+    estimation_config: Dict = None
+    
+    # Lines 46-51
+    reg_config: Dict = None
     
     def __post_init__(self):
         if self.age_labels is None:
