@@ -2,28 +2,12 @@
 import torch
 import numpy as np
 
-# Migrate entire functions:
-
-def format_iter_report(pred, truth, subpop_truths, iteration_count, g_norm=None, sse_obj=None, verbose=True):
-    # Surgical Edit: Logic to only print if flag is True
-    if not verbose: return 0.0, 0.0
-    sse_global = torch.sum((pred.sum(dim=(1,2,3)) - truth.sum(dim=(1,2,3))) ** 2).item()
-    ss_tot_g = torch.sum((truth.sum(dim=(1,2,3)) - torch.mean(truth.sum(dim=(1,2,3)))) ** 2).item()
-    r2_global = 1.0 - (sse_global / ss_tot_g) if ss_tot_g > 0 else 0.0
-    p_err_g = abs(pred.sum(dim=(1,2,3)).max().item() - truth.sum(dim=(1,2,3)).max().item()) / truth.sum(dim=(1,2,3)).max().item()
-    out = f"Iter {iteration_count:02d} | Global: SSE={sse_global:.3f}, R2={r2_global:.4f}, P.Err={p_err_g*100:.1f}%"
-    if g_norm is not None: out += f", Grad={g_norm:.5f}"
-    print(out)
-    if sse_obj is not None: print(f"         SSE SUM (Objective): {sse_obj:.3f}")
-    for i, name in enumerate(['A', 'B', 'C']):
-        p_sub, t_sub = pred[:, i].sum(dim=(1, 2)), subpop_truths[i]
-        s_sse = torch.sum((p_sub - t_sub) ** 2).item()
-        s_ss_tot = torch.sum((t_sub - torch.mean(t_sub)) ** 2).item()
-        s_r2 = 1.0 - (s_sse / s_ss_tot) if s_ss_tot > 0 else 0.0
-        print(f"         Subpop {name}: SSE={s_sse:.3f}, R2={s_r2:.4f}, P.Err={(abs(p_sub.max().item()-t_sub.max().item())/t_sub.max().item())*100:.1f}%")
-    return sse_global, r2_global
-
+# Line 111-139: print_beta_e0_table
 def print_beta_e0_table(true_betas, opt_betas, true_e0, opt_e0, best_probe_details=None):
+    """
+    Print Stage 1 Beta & E0 parameter recovery table
+    Lines 111-139
+    """
     print(f"\n>>> STAGE 1: BETA & E0 PARAMETER RECOVERY <<<")
     print("="*105)
     print(f"{'LOCATION':<12} | {'AGE':<6} | {'TRUE E0':<12} | {'OPT E0':<12} | {'BETA (TRUE)':<12} | {'BETA (OPT)':<12} | {'% DEV':<8}")
@@ -50,7 +34,12 @@ def print_beta_e0_table(true_betas, opt_betas, true_e0, opt_e0, best_probe_detai
         print(f"  SSE SUM = {best_probe_details['pure_fit_sse']:.3f} (SSE) + {best_probe_details['reg_penalty']:.3f} (regularization)")
     print("="*105)
 
+# Lines 141-167: print_results_table
 def print_results_table(label, true_ihrs, opt_ihrs, truth_data, pred_data):
+    """
+    Print IHR calibration results table
+    Lines 141-167
+    """
     print(f"\n>>> {label} <<<")
     print("="*80)
     print(f"{'LOC-AGE':<10} | {'TRUE IHR':<10} | {'OPT IHR':<10} | {'% DEV':<10} | {'SSE':<12} | {'R2':<8}")
@@ -83,3 +72,29 @@ def print_results_table(label, true_ihrs, opt_ihrs, truth_data, pred_data):
     if opt_ihrs is not None:
         print(f"PARAMETER SSE: {np.sum((opt_ihrs - true_ihrs.flatten())**2):.8f}")
     print("="*80)
+
+# Lines 169-195: format_iter_report
+def format_iter_report(pred, truth, subpop_truths, iteration_count, g_norm=None, sse_obj=None, verbose=True):
+    """
+    Format and print iteration report
+    Lines 169-195
+    
+    NOTE: Lines 171-172 contain critical VERBOSE_LBFGS check!
+    """
+    if not verbose: 
+        return 0.0, 0.0
+    sse_global = torch.sum((pred.sum(dim=(1,2,3)) - truth.sum(dim=(1,2,3))) ** 2).item()
+    ss_tot_g = torch.sum((truth.sum(dim=(1,2,3)) - torch.mean(truth.sum(dim=(1,2,3)))) ** 2).item()
+    r2_global = 1.0 - (sse_global / ss_tot_g) if ss_tot_g > 0 else 0.0
+    p_err_g = abs(pred.sum(dim=(1,2,3)).max().item() - truth.sum(dim=(1,2,3)).max().item()) / truth.sum(dim=(1,2,3)).max().item()
+    out = f"Iter {iteration_count:02d} | Global: SSE={sse_global:.3f}, R2={r2_global:.4f}, P.Err={p_err_g*100:.1f}%"
+    if g_norm is not None: out += f", Grad={g_norm:.5f}"
+    print(out)
+    if sse_obj is not None: print(f"         SSE SUM (Objective): {sse_obj:.3f}")
+    for i, name in enumerate(['A', 'B', 'C']):
+        p_sub, t_sub = pred[:, i].sum(dim=(1, 2)), subpop_truths[i]
+        s_sse = torch.sum((p_sub - t_sub) ** 2).item()
+        s_ss_tot = torch.sum((t_sub - torch.mean(t_sub)) ** 2).item()
+        s_r2 = 1.0 - (s_sse / s_ss_tot) if s_ss_tot > 0 else 0.0
+        print(f"         Subpop {name}: SSE={s_sse:.3f}, R2={s_r2:.4f}, P.Err={(abs(p_sub.max().item()-t_sub.max().item())/t_sub.max().item())*100:.1f}%")
+    return sse_global, r2_global
