@@ -4,9 +4,9 @@ import numpy as np
 
 # Migrate entire functions:
 
-def format_iter_report(pred, truth, subpop_truths, iteration_count, g_norm=None, sse_obj=None):
+def format_iter_report(pred, truth, subpop_truths, iteration_count, g_norm=None, sse_obj=None, verbose=True):
     # Surgical Edit: Logic to only print if flag is True
-    if not VERBOSE_LBFGS: return 0.0, 0.0
+    if not verbose: return 0.0, 0.0
     sse_global = torch.sum((pred.sum(dim=(1,2,3)) - truth.sum(dim=(1,2,3))) ** 2).item()
     ss_tot_g = torch.sum((truth.sum(dim=(1,2,3)) - torch.mean(truth.sum(dim=(1,2,3)))) ** 2).item()
     r2_global = 1.0 - (sse_global / ss_tot_g) if ss_tot_g > 0 else 0.0
