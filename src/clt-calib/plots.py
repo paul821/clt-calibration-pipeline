@@ -128,3 +128,29 @@ def print_results_table(label, true_ihrs, opt_ihrs, truth_data, pred_data):
     if opt_ihrs is not None:
         print(f"PARAMETER SSE: {np.sum((opt_ihrs - true_ihrs.flatten())**2):.8f}")
     print("="*80)
+
+
+
+def save_diagnostic_plots(truth_noisy, truth_clean, opt_pred, current_T):
+    t_days = np.arange(current_T)
+    obs_np, tru_np, est_np = [x.detach().cpu().numpy().squeeze(-1) for x in [truth_noisy, truth_clean, opt_pred]]
+    fig1, axes1 = plt.subplots(5, 3, figsize=(15, 20), sharex=True)
+    for r_idx, r_name in enumerate(["Loc A", "Loc B", "Loc C"]):
+        for a_idx in range(5):
+            ax = axes1[a_idx, r_idx]; obs, tru, est = obs_np[:, r_idx, a_idx], tru_np[:, r_idx, a_idx], est_np[:, r_idx, a_idx]
+            ax.scatter(t_days, obs, color='black', alpha=0.3, s=8, label='Noisy Obs')
+            ax.plot(t_days, tru, color='green', linewidth=1.5, label='Ground Truth')
+            ax.plot(t_days, est, color='red', linestyle='--', linewidth=1.5, label='Estimated')
+            
+            ss_tot = np.sum((obs - np.mean(obs))**2)
+            r2_tru = (1-(np.sum((obs-tru)**2)/ss_tot)) if ss_tot > 0 else 0
+            r2_est = (1-(np.sum((obs-est)**2)/ss_tot)) if ss_tot > 0 else 0
+            
+            ax.set_title(f"{r_name} - Age {AGE_LABELS[a_idx]}")
+            ax.text(0.95, 0.94, f"Ground Truth R²: {r2_tru:.3f}", transform=ax.transAxes, ha='right', color='green', fontsize=9)
+            ax.text(0.95, 0.89, f"Estimated R²: {r2_est:.3f}", transform=ax.transAxes, ha='right', color='red', fontsize=9)
+            
+            if r_idx == 0 and a_idx == 0:
+                ax.legend(loc='upper right', bbox_to_anchor=(0.95, 0.85))
+                
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95]); plt.savefig("calibration_15_panel.png"); print("Saved: calibration_15_panel.png")
