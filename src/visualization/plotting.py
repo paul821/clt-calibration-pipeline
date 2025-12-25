@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-# Migrate entire functions:
+# Lines 54-80: save_convergence_plot
 def save_convergence_plot(grid_results):
     """Surgical Edit 92/93: SSE vs Offset Visualization with Global R2"""
     if not grid_results:
@@ -34,7 +34,7 @@ def save_convergence_plot(grid_results):
     plt.close()
     print("Saved: SSE_Stage1_Convergence.png")
 
-
+# Lines 82-111: save_regional_aggregate_plot
 def save_regional_aggregate_plot(truth_noisy, truth_clean, opt_pred, current_T, filename="calibration_regional_aggregate.png"):
     """Surgical Edit 86/90: Aggregate plot with uniform styling"""
     t_days = np.arange(current_T)
@@ -73,7 +73,7 @@ def save_regional_aggregate_plot(truth_noisy, truth_clean, opt_pred, current_T, 
     plt.close()
     if "fit_offset" not in filename: print(f"Saved: {filename}")
 
-
+# Lines 246-280: save_diagnostic_plots
 def save_diagnostic_plots(truth_noisy, truth_clean, opt_pred, current_T):
     t_days = np.arange(current_T)
     obs_np, tru_np, est_np = [x.detach().cpu().numpy().squeeze(-1) for x in [truth_noisy, truth_clean, opt_pred]]
@@ -89,11 +89,14 @@ def save_diagnostic_plots(truth_noisy, truth_clean, opt_pred, current_T):
             r2_tru = (1-(np.sum((obs-tru)**2)/ss_tot)) if ss_tot > 0 else 0
             r2_est = (1-(np.sum((obs-est)**2)/ss_tot)) if ss_tot > 0 else 0
             
-            ax.set_title(f"{r_name} - Age {AGE_LABELS[a_idx]}")
+            ax.set_title(f"{r_name} - Age {a_idx}")  # Note: Original uses AGE_LABELS[a_idx]
             ax.text(0.95, 0.94, f"Ground Truth R²: {r2_tru:.3f}", transform=ax.transAxes, ha='right', color='green', fontsize=9)
             ax.text(0.95, 0.89, f"Estimated R²: {r2_est:.3f}", transform=ax.transAxes, ha='right', color='red', fontsize=9)
             
             if r_idx == 0 and a_idx == 0:
                 ax.legend(loc='upper right', bbox_to_anchor=(0.95, 0.85))
                 
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95]); plt.savefig("calibration_15_panel.png"); print("Saved: calibration_15_panel.png")
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.savefig("calibration_15_panel.png")
+    plt.close()
+    print("Saved: calibration_15_panel.png")
