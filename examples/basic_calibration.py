@@ -50,7 +50,7 @@ def main():
         # Regularization (L2 on beta only)
         calib_config.regularization = RegularizationConfig(
             beta_type="l2_magnitude",
-            beta_lambda=1e-2,
+            beta_lambda=1e-6,
             compartment_configs={}
         )
         

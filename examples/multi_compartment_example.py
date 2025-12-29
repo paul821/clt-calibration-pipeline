@@ -60,18 +60,18 @@ def main():
         # Mixed regularization
         calib_config.regularization = RegularizationConfig(
             beta_type="l2_magnitude",
-            beta_lambda=1e-2,
+            beta_lambda=1e-6,
             compartment_configs={
                 "E": {
                     "type": "structural",
-                    "location_targets": [0.0, 1.0, 0.0],  # Location 1 only
-                    "age_targets": [0, 0, 1, 0, 0],       # Age 2 only
-                    "lambda_on_target": 10.0,
-                    "lambda_off_target": 10.0
+                    "location_targets": [0.0, 1.0, 0.0],
+                    "age_targets": [0, 0, 1, 0, 0],
+                    "lambda_on_target": 100000.0,  # CRITICAL FIX
+                    "lambda_off_target": 100000.0  # CRITICAL FIX
                 },
                 "IP": {
-                    "type": "l2_magnitude",  # Simple L2 penalty on IP0
-                    "lambda": 1e-3
+                    "type": "l2_magnitude",
+                    "lambda": 1e-8  # CRITICAL FIX: was 1e-3
                 }
             }
         )

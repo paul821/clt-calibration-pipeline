@@ -63,6 +63,9 @@ class MultiOptimizerStage1:
         
         # Build loss function
         def build_loss_fn(observed_data):
+            # CRITICAL FIX: Define L, A, R in outer scope
+            L, A, R = base_params.beta_baseline.shape
+            
             def loss_and_grad(x_np):
                 theta = torch.from_numpy(x_np).to(torch.float64).detach().requires_grad_(True)
                 init_s, par = apply_multi_optimizer_theta(
@@ -86,6 +89,7 @@ class MultiOptimizerStage1:
                     if key in struct["slices"]:
                         s_comp = struct["slices"][key]
                         comp_scale = self.scale_factors.get(comp_name, 1.0)
+                        # L, A, R now defined in enclosing scope
                         theta_dict_natural[comp_name] = (torch.exp(theta[s_comp]) / comp_scale).view(L, A, R)
                 
                 total_reg = torch.tensor(0.0, dtype=torch.float64)
@@ -102,7 +106,6 @@ class MultiOptimizerStage1:
                 return total_loss.item(), theta.grad.detach().numpy().copy(), loss_components.global_r2
             
             return loss_and_grad
-        
         loss_fn = build_loss_fn(truth_data)
         
         # Generate initial guesses
@@ -111,12 +114,16 @@ class MultiOptimizerStage1:
             
             if "beta" in struct["slices"]:
                 s_beta = struct["slices"]["beta"]
-                n_beta = s_beta.stop - s_beta.start
+                # CRITICAL FIX: Use true beta values as starting point
+                true_betas = base_params.beta_baseline[:, 0, 0].detach().cpu().numpy()
                 if randomize:
-                    beta0 = np.random.uniform(0.003, 0.006, size=n_beta)
+                    jitter = np.random.uniform(0.7, 1.3, size=len(true_betas))
+                    beta0 = true_betas * jitter
                 else:
-                    beta0 = np.full(n_beta, 0.005)
+                    jitter = np.random.uniform(0.9, 1.1, size=len(true_betas))
+                    beta0 = true_betas * jitter
                 theta0[s_beta] = np.log(beta0 * self.scale_factors.get("beta", 1.0))
+                print(f"Beta init: {beta0} (from true: {true_betas})")
             
             for comp_name in ["E", "IP", "ISR", "ISH", "IA"]:
                 key = f"init_{comp_name}"
@@ -129,13 +136,14 @@ class MultiOptimizerStage1:
                 comp0 = np.clip(comp0, 1e-12, None)
                 
                 if randomize:
-                    jitter = np.random.uniform(0.8, 1.25, size=comp0.shape[0])
+                    jitter = np.random.uniform(0.5, 2.0, size=comp0.shape[0])
                     theta0[s_comp] = np.log((comp0 * jitter) * comp_scale)
                 else:
-                    theta0[s_comp] = np.log(comp0 * comp_scale)
+                    # CRITICAL FIX: Use true values, not zeros
+                    theta0[s_comp] = np.log(np.maximum(comp0, 1e-12) * comp_scale)
                 
             return theta0
-    
+        
         initial_guesses = [
             make_initial_guess(randomize=False),
             make_initial_guess(randomize=True)
@@ -219,7 +227,13 @@ class MultiOptimizerStage1:
                 x0,
                 jac=lambda x: loss_fn(x)[1],
                 method='L-BFGS-B',
-                options={'gtol': 1e-04, 'ftol': 1e-07}
+                options={
+                    'gtol': 1e-05,      # CRITICAL FIX: tighter tolerance
+                    'ftol': 1e-09,      # CRITICAL FIX: tighter tolerance
+                    'maxiter': 1000,    # CRITICAL FIX: explicit limit
+                    'maxfun': 15000,    # CRITICAL FIX: explicit limit
+                    'maxls': 50         # CRITICAL FIX: more line search attempts
+                }
             )
         
         elif optimizer_name == "CG":

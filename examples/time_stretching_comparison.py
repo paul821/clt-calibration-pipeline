@@ -44,14 +44,14 @@ def run_with_time_stretch(time_stretch_factor):
     
     calib_config.regularization = RegularizationConfig(
         beta_type="l2_magnitude",
-        beta_lambda=1e-2,
+        beta_lambda=1e-6,
         compartment_configs={
             "E": {
                 "type": "structural",
                 "location_targets": [0.0, 1.0, 0.0],
                 "age_targets": [0, 0, 1, 0, 0],
-                "lambda_on_target": 10.0,
-                "lambda_off_target": 10.0
+                "lambda_on_target": 100000.0,  # CRITICAL FIX
+                "lambda_off_target": 100000.0  # CRITICAL FIX
             }
         }
     )

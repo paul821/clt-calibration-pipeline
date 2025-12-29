@@ -8,7 +8,7 @@ class RegularizationConfig:
     
     # Beta regularization (magnitude-based)
     beta_type: str = "l2_magnitude"  # "l2_magnitude" or "none"
-    beta_lambda: float = 1e-2
+    beta_lambda: float = 1e-6  # CRITICAL FIX: was 1e-2, too large for log-space
     
     # Compartment regularization (can be structural or magnitude)
     compartment_configs: Dict[str, Dict] = field(default_factory=dict)
@@ -18,8 +18,8 @@ class RegularizationConfig:
     #         "type": "structural",
     #         "location_targets": [0.0, 1.0, 0.0],  # which locations seeded
     #         "age_targets": [0, 0, 1, 0, 0],       # which ages seeded (one-hot)
-    #         "lambda_on_target": 10.0,
-    #         "lambda_off_target": 10.0
+    #         "lambda_on_target": 100000.0,  # CRITICAL FIX: was 10.0, had no effect
+    #         "lambda_off_target": 100000.0  # CRITICAL FIX: was 10.0, had no effect
     #     },
     #     "IP": {
     #         "type": "l2_magnitude",
@@ -127,4 +127,4 @@ class CalibrationConfig:
         if self.mode == "IHR_MODE":
             self.loss_aggregation = "regional"  # Force regional for Stage 1
             if "ihr_param" not in self.estimation_config:
-                self.estimation_config["ihr_param"] = "L"
+                self.estimation_config["ihr_param"] = "LA"

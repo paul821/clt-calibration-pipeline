@@ -24,7 +24,16 @@ class L2MagnitudeRegularization(RegularizationTerm):
             return torch.tensor(0.0, dtype=torch.float64)
         
         param = theta_dict[self.param_name]
-        return self.lambda_val * torch.sum(param ** 2)
+        # CRITICAL FIX: L2 on log-space values, not natural-space
+        # (theta_dict contains natural-space values, we need log-space for proper L2)
+        # Actually, no - we want L2 on natural space to penalize large natural values
+        penalty = self.lambda_val * torch.sum(param ** 2)
+        
+        # DEBUG: Print penalty magnitude
+        if penalty.item() > 0:
+            print(f"L2 penalty for {self.param_name}: {penalty.item():.6f} (lambda={self.lambda_val})")
+        
+        return penalty
 
 class StructuralRegularization(RegularizationTerm):
     """
@@ -82,6 +91,16 @@ class StructuralRegularization(RegularizationTerm):
         penalty = torch.sum(
             self.weight_tensor * (comp_vals - self.target_tensor)**2
         )
+        
+        # CRITICAL FIX: Add debug logging
+        if penalty.item() > 0:
+            print(f"Structural penalty for {self.compartment_name}: {penalty.item():.6f}")
+            print(f"  On-target lambda: {self.lambda_on}, Off-target lambda: {self.lambda_off}")
+            print(f"  Target sum: {self.target_tensor.sum().item():.3f}, Actual sum: {comp_vals.sum().item():.3f}")
+            # Print where violations are largest
+            max_violation_idx = torch.argmax(torch.abs(comp_vals - self.target_tensor))
+            max_violation_val = (comp_vals.flatten()[max_violation_idx] - self.target_tensor.flatten()[max_violation_idx]).item()
+            print(f"  Max violation: {max_violation_val:.6f} at index {max_violation_idx}")
         
         return penalty
 

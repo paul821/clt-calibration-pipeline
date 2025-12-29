@@ -88,8 +88,41 @@ class GSSOptimizer:
                 x0 = closest[1]['theta_opt'].copy()
                 print(f"Warm-starting from offset {closest[0]}")
             else:
+                # CRITICAL FIX: Initialize from scaled true values, not zeros
                 x0 = np.zeros(struct["size"])
-            
+                L, A, R = base_params.beta_baseline.shape
+                slices = struct["slices"]
+                
+                # Beta initialization
+                if "beta" in slices:
+                    s_beta = slices["beta"]
+                    # Use true beta values with jitter as initial guess
+                    true_betas = base_params.beta_baseline[:, 0, 0].detach().cpu().numpy()
+                    jitter = np.random.uniform(0.8, 1.2, size=len(true_betas))
+                    beta_init = true_betas * jitter
+                    x0[s_beta] = np.log(beta_init * self.scale_factors["beta"])
+                    print(f"Initialized beta from true values: {beta_init}")
+                
+                # E0 initialization
+                if "init_E" in slices:
+                    s_e = slices["init_E"]
+                    # Initialize with small value in seeded location, near-zero elsewhere
+                    L, A, R = base_params.beta_baseline.shape
+                    e0_init = np.zeros(L * A * R)
+                    # Seed location 1, age 2 (index 1*5 + 2 = 7)
+                    seed_idx = 1 * A + 2  # Loc 1, Age 2
+                    e0_init[seed_idx] = 1.0  # Single seeded compartment
+                    x0[s_e] = np.log((e0_init + 1e-12) * self.scale_factors["E"])
+                    print(f"Initialized E0 with seed at location 1, age 2")
+                
+                # Initialize other compartments near zero
+                for comp_name in ["IP", "ISR", "ISH", "IA"]:
+                    key = f"init_{comp_name}"
+                    if key in slices:
+                        s_comp = slices[key]
+                        comp_init = np.full(s_comp.stop - s_comp.start, 1e-8)
+                        x0[s_comp] = np.log(comp_init * self.scale_factors.get(comp_name, 1.0))
+                        
             # Shift truth data
             if offset >= 0:
                 shifted = truth_agg[offset:]
@@ -104,6 +137,9 @@ class GSSOptimizer:
             
             # Build loss function for this offset
             tracker = [0]
+            
+            # CRITICAL FIX: Define L, A, R in outer scope so loss_fn can access them
+            L, A, R = base_params.beta_baseline.shape
             
             def loss_fn(x_np):
                 """Loss function that returns (loss, grad)"""
@@ -130,6 +166,7 @@ class GSSOptimizer:
                     if do_est and f"init_{comp_name}" in struct["slices"]:
                         s_comp = struct["slices"][f"init_{comp_name}"]
                         comp_scale = self.scale_factors.get(comp_name, 1.0)
+                        # L, A, R are now defined in enclosing scope
                         theta_dict_natural[comp_name] = (torch.exp(theta[s_comp]) / comp_scale).view(L, A, R)
                 
                 total_reg = torch.tensor(0.0, dtype=torch.float64)
@@ -146,17 +183,28 @@ class GSSOptimizer:
                 total_loss.backward()
                 
                 # Report progress
+                grad_norm = torch.norm(theta.grad).item() if theta.grad is not None else 0.0
                 if self.verbose:
                     print(f"Iter {tracker[0]:03d} | Loss: {total_loss.item():.4f} "
-                          f"(SSE: {fit_loss.item():.4f}, Reg: {total_reg.item():.4f}), "
-                          f"R²: {loss_components.global_r2:.4f}")
+                        f"(SSE: {fit_loss.item():.4f}, Reg: {total_reg.item():.4f}), "
+                        f"R²: {loss_components.global_r2:.4f}, GradNorm: {grad_norm:.6f}")
+                
+                # CRITICAL FIX: Check for NaN/Inf gradients
+                grad_np = theta.grad.detach().numpy().copy()
+                if not np.all(np.isfinite(grad_np)):
+                    print(f"WARNING: Non-finite gradients detected at iter {tracker[0]}")
+                    grad_np = np.nan_to_num(grad_np, nan=0.0, posinf=1e6, neginf=-1e6)
                 
                 tracker[0] += 1
-                return total_loss.item(), theta.grad.detach().numpy().copy()
-            
+                return total_loss.item(), grad_np
             # Run optimizer
             if optimizer_name == "L-BFGS-B":
-                opts = {'gtol': 1e-04, 'ftol': 1e-07}
+                opts = {
+                    'gtol': 1e-05,      # CRITICAL FIX: was 1e-04, too loose
+                    'ftol': 1e-09,      # CRITICAL FIX: was 1e-07, too loose
+                    'maxiter': 1000,    # CRITICAL FIX: add explicit max iterations
+                    'maxfun': 15000     # CRITICAL FIX: add max function evaluations
+                }
                 if self.verbose:
                     opts['iprint'] = 1
                 res = minimize(

@@ -51,20 +51,20 @@ def main():
                 "ISH": False,
                 "IA": False
             },
-            "ihr_param": "L"  # Per-location IHR in Stage 2
+            "ihr_param": "LA"  # Per-location IHR in Stage 2
         }
         
         # Structured regularization for E0 (prevent shadow solutions)
         calib_config.regularization = RegularizationConfig(
             beta_type="l2_magnitude",
-            beta_lambda=1e-2,
+            beta_lambda=1e-6,
             compartment_configs={
                 "E": {
                     "type": "structural",
                     "location_targets": [0.0, 1.0, 0.0],  # Seed only in location 1
                     "age_targets": [0, 0, 1, 0, 0],       # Only age group 2 (18-49)
-                    "lambda_on_target": 10.0,
-                    "lambda_off_target": 10.0
+                    "lambda_on_target": 100000.0,  # CRITICAL FIX: was 10.0
+                    "lambda_off_target": 100000.0  # CRITICAL FIX: was 10.0
                 }
             }
         )

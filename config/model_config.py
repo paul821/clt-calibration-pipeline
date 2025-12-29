@@ -23,13 +23,13 @@ class ModelConfig:
     seed_value: float = 1.0
     
     scale_factors: Dict[str, float] = field(default_factory=lambda: {
-        "beta": 1.0,
-        "E": 1.0,
-        "IP": 1.0,
-        "ISR": 1.0,
-        "ISH": 1.0,
-        "IA": 1.0,
-        "ihr": 1.0
+        "beta": 0.01,  # CRITICAL FIX: was 1.0, causing 100x underestimation
+        "E": 0.1,      # CRITICAL FIX: was 1.0
+        "IP": 0.1,     # CRITICAL FIX: was 1.0
+        "ISR": 0.1,    # CRITICAL FIX: was 1.0
+        "ISH": 0.1,    # CRITICAL FIX: was 1.0
+        "IA": 0.1,     # CRITICAL FIX: was 1.0
+        "ihr": 0.01    # CRITICAL FIX: was 1.0
     })
     
     def __post_init__(self):
