@@ -61,3 +61,16 @@ Thumbs.db
 # Jupyter
 .ipynb_checkpoints/
 EOFCLT_BaseModel/
+# Build artifacts
+*.egg-info/
+clt_calibration_pipeline.egg-info/
+
+# Output files
+*.png
+*.pdf
+*.csv
+*_log_*.txt
+fit_offset_*.png
+SSE_Stage1_Convergence.png
+calibration_15_panel.png
+calibration_regional_aggregate.png

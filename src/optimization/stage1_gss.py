@@ -4,152 +4,320 @@ import numpy as np
 from scipy.optimize import minimize
 from typing import Dict, List, Tuple
 import copy
-import warnings  # Line 30!
 
-# Import flu_core after environment setup
-
+# Import flu_core inside methods (after environment setup)
 from ..utils.theta_transforms import build_gss_theta_structure, apply_gss_theta
 from ..utils.metrics import format_iter_report
 from ..visualization.plotting import save_convergence_plot, save_regional_aggregate_plot
+from ..loss.regional_loss import RegionalLossFunction
+from ..loss.regularization import build_regularization_terms
 
 class GSSOptimizer:
-    """Golden Section Search optimizer for Stage 1 (Beta & E0)"""
+    """
+    Golden Section Search optimizer for Stage 1 (Professor's approach)
     
-    def __init__(self, config, estimation_config, reg_config, verbose=False):
+    ENHANCEMENTS:
+    - Supports multiple initial compartments (not just E0)
+    - Supports multiple optimizers (L-BFGS-B, CG, Adam, least_squares_fd)
+    - Regional loss decomposition with structured regularization
+    """
+    
+    def __init__(self, config, estimation_config, scale_factors, verbose=False):
         self.config = config
         self.estimation_config = estimation_config
-        self.reg_config = reg_config
+        self.scale_factors = scale_factors
         self.verbose = verbose
         self.timesteps_per_day = config.timesteps_per_day
+        self.optimizers = config.optimizers if hasattr(config, 'optimizers') else ["L-BFGS-B"]
     
     def run(self, truth_data_15ch, clean_truth_15ch, base_state, base_params, metapop_handle):
         """
-        Lines 282-381: Complete GSS Stage
+        Main GSS optimization routine with multi-optimizer support
+        
+        Returns:
+            best_results: dict with keys per optimizer (e.g., {"L-BFGS-B": {...}, "CG": {...}})
+            struct: theta structure
+            all_attempts: list of all optimization attempts across all offsets and optimizers
         """
         import flu_core as flu
-        # Lines 283-285
+        
         struct = build_gss_theta_structure(self.estimation_config, base_state, base_params)
-        grid_results = []
-        truth_agg = truth_data_15ch.sum(dim=2, keepdim=True)
+        truth_agg = truth_data_15ch.sum(dim=2, keepdim=True)  # Aggregate over age for Stage 1
         
-        # Lines 287-314: gss_loss_fn
-        def gss_loss_fn(x_np, shifted_truth_agg, current_T, iteration_tracker):
-            theta = torch.from_numpy(x_np).to(torch.float64).detach().requires_grad_(True)
-            init_s, par = apply_gss_theta(theta, self.estimation_config, struct, base_state, base_params)
-            inputs = metapop_handle.get_flu_torch_inputs()
-            pred = flu.torch_simulate_hospital_admits(init_s, par, inputs["precomputed"], inputs["schedule_tensors"], current_T, self.timesteps_per_day)
-            regional_sse = [torch.sum((pred[:, i].sum(dim=(1, 2)) - shifted_truth_agg[:, i].sum(dim=(1, 2))) ** 2) for i in range(3)]
-            fit_obj = torch.stack(regional_sse).sum()
-            e0_penalty = torch.tensor(0.0, dtype=torch.float64)
-            if "init_E" in struct["slices"]:
-                e0_vals, target_ages = torch.exp(theta[struct["slices"]["init_E"]]).view(3, 5), self.reg_config["target_e0_values"]
-                for r in range(3):
-                    for a in range(5):
-                        w = self.reg_config["lambda_e0_target"] if a == self.reg_config["target_age_idx"] else self.reg_config["lambda_e0_zero"]
-                        e0_penalty += w * (e0_vals[r, a] - (target_ages[r] if a == self.reg_config["target_age_idx"] else 0.0))**2
-            total_loss = fit_obj + e0_penalty
-            total_loss.backward()
-            format_iter_report(pred, shifted_truth_agg, [shifted_truth_agg[:, i].sum(dim=(1, 2)) for i in range(3)], iteration_tracker[0], np.linalg.norm(theta.grad.detach().numpy()), fit_obj.item(), verbose=self.verbose)
-            iteration_tracker[0] += 1
-            return total_loss.item(), theta.grad.detach().numpy().copy()
+        # Build regularization terms
+        L, A, R = base_params.beta_baseline.shape
+        shape_dict = {"beta": (L,)}
+        for comp_name, do_est in self.estimation_config["estimate_initial"].items():
+            if do_est:
+                shape_dict[comp_name] = (L, A, R)
         
-        # Lines 316-356: evaluate_offset
-        def evaluate_offset(offset):
+        reg_terms = build_regularization_terms(self.config, shape_dict)
+        loss_fn_obj = RegionalLossFunction(self.config, aggregation_mode="regional", timesteps_per_day=self.timesteps_per_day)
+        
+        # Store results per optimizer
+        optimizer_results = {opt_name: [] for opt_name in self.optimizers}
+        all_attempts = []
+        
+        # GSS parameters
+        a, b = self.config.gss_offset_range if self.config.enable_gss else (0, 0)
+        inv_phi2, inv_phi = (3 - np.sqrt(5)) / 2, (np.sqrt(5) - 1) / 2
+        
+        if not self.config.enable_gss:
+            # No offset search, just optimize at offset=0
+            offsets_to_probe = [0]
+        else:
+            c, d = a + inv_phi2 * (b - a), a + inv_phi * (b - a)
+            offsets_to_probe = [a, b, c, d]
+        
+        def evaluate_offset_with_optimizer(offset, optimizer_name):
+            """Run one optimizer at one offset"""
             offset = int(round(offset))
-            for off, res in grid_results:
-                if off == offset: return res['loss']
-            print(f"\n" + "-"*40 + f"\n PROBING OFFSET:   {offset} days \n" + "-"*40)
-            if grid_results:
-                closest_off = min(grid_results, key=lambda x: abs(x[0] - offset))[0]
-                print(f"Warm-starting offset {offset} from closest neighbor offset {closest_off}")
-                x0 = next(res['theta_opt'] for off, res in grid_results if off == closest_off).copy()
-            else: x0 = np.zeros(struct["size"])
             
-            if offset >= 0: 
-                shifted = truth_agg[offset:]; shifted_clean = clean_truth_15ch[offset:]
+            # Check if already computed
+            for prev_offset, prev_res in optimizer_results[optimizer_name]:
+                if prev_offset == offset:
+                    return prev_res
+            
+            print(f"\n{'-'*60}")
+            print(f"OPTIMIZER: {optimizer_name} | OFFSET: {offset} days")
+            print(f"{'-'*60}")
+            
+            # Warm-start from nearest offset if available
+            if optimizer_results[optimizer_name]:
+                closest = min(optimizer_results[optimizer_name], key=lambda x: abs(x[0] - offset))
+                x0 = closest[1]['theta_opt'].copy()
+                print(f"Warm-starting from offset {closest[0]}")
+            else:
+                x0 = np.zeros(struct["size"])
+            
+            # Shift truth data
+            if offset >= 0:
+                shifted = truth_agg[offset:]
+                shifted_clean = clean_truth_15ch[offset:]
                 current_T = self.config.T - offset
-            else: 
-                pad_n = torch.zeros((abs(offset), 3, 1, 1)); pad_c = torch.zeros((abs(offset), 3, 5, 1))
+            else:
+                pad_n = torch.zeros((abs(offset), 3, 1, 1))
+                pad_c = torch.zeros((abs(offset), 3, 5, 1))
                 shifted = torch.cat([pad_n, truth_agg], dim=0)[:self.config.T]
                 shifted_clean = torch.cat([pad_c, clean_truth_15ch], dim=0)[:self.config.T]
                 current_T = self.config.T
-                
-            tracker = [0]
-            # Lines 334-336: Surgical Edit - Bypassing deprecation warning
-            lbfgs_opts = {'gtol': 1e-04, 'ftol': 1e-07}
-            if self.verbose: lbfgs_opts['iprint'] = 1
-
-            res = minimize(lambda x: gss_loss_fn(x, shifted, current_T, tracker)[0], x0, jac=lambda x: gss_loss_fn(x, shifted, current_T, tracker)[1], method='L-BFGS-B', options=lbfgs_opts)
-            print(f"BETA Optimization Termination Message: {res.message}")
             
-            # Lines 340-365: Post-optimization metric calculation
+            # Build loss function for this offset
+            tracker = [0]
+            
+            def loss_fn(x_np):
+                """Loss function that returns (loss, grad)"""
+                theta = torch.from_numpy(x_np).to(torch.float64).detach().requires_grad_(True)
+                init_s, par = apply_gss_theta(theta, self.estimation_config, struct, base_state, base_params, self.scale_factors)
+                
+                inputs = metapop_handle.get_flu_torch_inputs()
+                pred = flu.torch_simulate_hospital_admits(
+                    init_s, par, inputs["precomputed"], inputs["schedule_tensors"], 
+                    current_T, self.timesteps_per_day
+                )
+                
+                # Compute regularization
+                reg_dict = {}
+                theta_dict_natural = {}
+                
+                # Beta in natural scale
+                if "beta" in struct["slices"]:
+                    s_beta = struct["slices"]["beta"]
+                    theta_dict_natural["beta"] = torch.exp(theta[s_beta]) / self.scale_factors.get("beta", 1.0)
+                
+                # Compartments in natural scale
+                for comp_name, do_est in self.estimation_config["estimate_initial"].items():
+                    if do_est and f"init_{comp_name}" in struct["slices"]:
+                        s_comp = struct["slices"][f"init_{comp_name}"]
+                        comp_scale = self.scale_factors.get(comp_name, 1.0)
+                        theta_dict_natural[comp_name] = (torch.exp(theta[s_comp]) / comp_scale).view(L, A, R)
+                
+                total_reg = torch.tensor(0.0, dtype=torch.float64)
+                for reg_name, reg_term in reg_terms.items():
+                    reg_val = reg_term.compute(theta_dict_natural)
+                    reg_dict[reg_name] = reg_val
+                    total_reg += reg_val
+                
+                # Compute data fit loss
+                loss_components = loss_fn_obj(pred, shifted)
+                fit_loss = torch.tensor(loss_components.sse, dtype=torch.float64)
+                
+                total_loss = fit_loss + total_reg
+                total_loss.backward()
+                
+                # Report progress
+                if self.verbose:
+                    print(f"Iter {tracker[0]:03d} | Loss: {total_loss.item():.4f} "
+                          f"(SSE: {fit_loss.item():.4f}, Reg: {total_reg.item():.4f}), "
+                          f"R²: {loss_components.global_r2:.4f}")
+                
+                tracker[0] += 1
+                return total_loss.item(), theta.grad.detach().numpy().copy()
+            
+            # Run optimizer
+            if optimizer_name == "L-BFGS-B":
+                opts = {'gtol': 1e-04, 'ftol': 1e-07}
+                if self.verbose:
+                    opts['iprint'] = 1
+                res = minimize(
+                    lambda x: loss_fn(x)[0],
+                    x0,
+                    jac=lambda x: loss_fn(x)[1],
+                    method='L-BFGS-B',
+                    options=opts
+                )
+            
+            elif optimizer_name == "CG":
+                opts = {'gtol': 1e-04}
+                if self.verbose:
+                    opts['disp'] = True
+                res = minimize(
+                    lambda x: loss_fn(x)[0],
+                    x0,
+                    jac=lambda x: loss_fn(x)[1],
+                    method='CG',
+                    options=opts
+                )
+            
+            elif optimizer_name == "Adam":
+                # Manual Adam implementation
+                theta = torch.tensor(x0, dtype=torch.float64, requires_grad=True)
+                adam_optimizer = torch.optim.Adam([theta], lr=0.01)
+                
+                for i in range(1000):
+                    adam_optimizer.zero_grad()
+                    loss_val, grad_np = loss_fn(theta.detach().numpy())
+                    if not np.isfinite(loss_val):
+                        break
+                    theta.grad = torch.tensor(grad_np)
+                    adam_optimizer.step()
+                
+                res = type('Result', (), {
+                    'x': theta.detach().numpy(),
+                    'fun': loss_val,
+                    'success': True,
+                    'message': 'Adam completed',
+                    'nit': 1000
+                })()
+            
+            elif optimizer_name == "least_squares_fd":
+                from scipy.optimize import least_squares
+                
+                def residuals(x_np):
+                    loss_val, _ = loss_fn(x_np)
+                    return np.array([np.sqrt(max(loss_val, 0.0))])
+                
+                res = least_squares(residuals, x0, jac='2-point', max_nfev=1000)
+                res.fun = res.cost * 2  # Convert back to loss
+            
+            else:
+                raise ValueError(f"Unknown optimizer: {optimizer_name}")
+            
+            print(f"{optimizer_name} Termination: {res.message}")
+            
+            # Evaluate final solution
             with torch.no_grad():
                 theta_final = torch.from_numpy(res.x)
-                init_s, par = apply_gss_theta(theta_final, self.estimation_config, struct, base_state, base_params)
+                init_s, par = apply_gss_theta(theta_final, self.estimation_config, struct, base_state, base_params, self.scale_factors)
                 inputs = metapop_handle.get_flu_torch_inputs()
-                final_p = flu.torch_simulate_hospital_admits(init_s, par, inputs["precomputed"], inputs["schedule_tensors"], current_T, self.timesteps_per_day)
+                final_p = flu.torch_simulate_hospital_admits(
+                    init_s, par, inputs["precomputed"], inputs["schedule_tensors"],
+                    current_T, self.timesteps_per_day
+                )
                 
-                # Recalculate component losses for reporting
-                reg_sse = [torch.sum((final_p[:, i].sum(dim=(1, 2)) - shifted[:, i].sum(dim=(1, 2))) ** 2).item() for i in range(3)]
-                pure_fit_sse = sum(reg_sse)
+                final_components = loss_fn_obj(final_p, shifted)
                 
-                e0_penalty = 0.0
-                if "init_E" in struct["slices"]:
-                    e0_vals = torch.exp(theta_final[struct["slices"]["init_E"]]).view(3, 5)
-                    target_ages = self.reg_config["target_e0_values"]
-                    for r in range(3):
-                        for a in range(5):
-                            w = self.reg_config["lambda_e0_target"] if a == self.reg_config["target_age_idx"] else self.reg_config["lambda_e0_zero"]
-                            e0_penalty += w * (e0_vals[r, a].item() - (target_ages[r] if a == self.reg_config["target_age_idx"] else 0.0))**2
-
-                reg_r2 = [(1.0 - (reg_sse[i]/torch.sum((shifted[:, i].sum(dim=(1, 2)) - torch.mean(shifted[:, i].sum(dim=(1, 2))))**2).item())) for i in range(3)]
-                g_true, g_pred = shifted.sum(dim=(1,2,3)), final_p.sum(dim=(1,2,3))
-                g_sse = torch.sum((g_pred - g_true)**2).item()
-                g_sstot = torch.sum((g_true - torch.mean(g_true))**2).item()
-                global_r2 = 1.0 - (g_sse / g_sstot) if g_sstot > 0 else 0.0
+                # Recompute regularization for breakdown
+                theta_dict_natural = {}
+                if "beta" in struct["slices"]:
+                    s_beta = struct["slices"]["beta"]
+                    theta_dict_natural["beta"] = torch.exp(theta_final[s_beta]) / self.scale_factors.get("beta", 1.0)
                 
-                save_regional_aggregate_plot(shifted, shifted_clean, final_p, current_T, filename=f"fit_offset_{offset}.png")
+                for comp_name, do_est in self.estimation_config["estimate_initial"].items():
+                    if do_est and f"init_{comp_name}" in struct["slices"]:
+                        s_comp = struct["slices"][f"init_{comp_name}"]
+                        comp_scale = self.scale_factors.get(comp_name, 1.0)
+                        theta_dict_natural[comp_name] = (torch.exp(theta_final[s_comp]) / comp_scale).view(L, A, R)
                 
-            grid_results.append((offset, {
-                'loss': res.fun, 
-                'theta_opt': res.x, 
-                'offset': offset, 
-                'T': current_T, 
-                'reg_sse': reg_sse, 
-                'pure_fit_sse': pure_fit_sse, 
-                'reg_penalty': e0_penalty, 
-                'reg_r2': reg_r2, 
-                'global_r2': global_r2
-            }))
-            return res.fun
-    
-        # Lines 358-374: GSS algorithm
-        a, b, inv_phi2, inv_phi = -30, 15, (3 - np.sqrt(5)) / 2, (np.sqrt(5) - 1) / 2
-        c, d = a + inv_phi2 * (b - a), a + inv_phi * (b - a)
-        evaluate_offset(a); evaluate_offset(b); yc, yd = evaluate_offset(c), evaluate_offset(d)
+                reg_breakdown = {}
+                total_reg_val = 0.0
+                for reg_name, reg_term in reg_terms.items():
+                    reg_val = reg_term.compute(theta_dict_natural).item()
+                    reg_breakdown[reg_name] = reg_val
+                    total_reg_val += reg_val
+                
+                save_regional_aggregate_plot(
+                    shifted, shifted_clean, final_p, current_T,
+                    filename=f"fit_{optimizer_name}_offset_{offset}.png"
+                )
+            
+            result = {
+                'optimizer': optimizer_name,
+                'offset': offset,
+                'T': current_T,
+                'loss': res.fun,
+                'theta_opt': res.x,
+                'pure_fit_sse': final_components.sse,
+                'reg_breakdown': reg_breakdown,
+                'total_reg': total_reg_val,
+                'reg_sse': final_components.regional_sse,
+                'reg_r2': final_components.regional_r2,
+                'global_r2': final_components.global_r2,
+                'nit': getattr(res, 'nit', 0)
+            }
+            
+            optimizer_results[optimizer_name].append((offset, result))
+            all_attempts.append(result)
+            
+            return result
         
-        while (b - a) > self.config.gss_tolerance:
-            print(f"\n--- GSS Interval: [{a:.2f}, {b:.2f}] (width: {(b-a):.2f}) ---")
-            if yc < yd:
-                print(f"   Result: f(c)={yc:.3f} < f(d)={yd:.3f}. Discarding upper interval [{d:.2f}, {b:.2f}].")
-                b, d, yd = d, c, yc
-                c = a + inv_phi2 * (b - a)
-                yc = evaluate_offset(c)
-            else:
-                print(f"   Result: f(d)={yd:.3f} <= f(c)={yc:.3f}. Discarding lower interval [{a:.2f}, {c:.2f}].")
-                a, c, yc = c, d, yd
-                d = a + inv_phi * (b - a)
-                yd = evaluate_offset(d)
+        # Run GSS or single offset evaluation
+        if not self.config.enable_gss:
+            # Just evaluate offset=0 with all optimizers
+            for opt_name in self.optimizers:
+                evaluate_offset_with_optimizer(0, opt_name)
+        else:
+            # Full GSS for each optimizer
+            for opt_name in self.optimizers:
+                print(f"\n{'='*70}")
+                print(f"GOLDEN SECTION SEARCH FOR {opt_name}")
+                print(f"{'='*70}")
+                
+                # Initial probes
+                for off in [a, b]:
+                    evaluate_offset_with_optimizer(off, opt_name)
+                
+                yc = evaluate_offset_with_optimizer(c, opt_name)['loss']
+                yd = evaluate_offset_with_optimizer(d, opt_name)['loss']
+                
+                # GSS iterations
+                a_local, b_local, c_local, d_local = a, b, c, d
+                while (b_local - a_local) > self.config.gss_tolerance:
+                    print(f"\nGSS Interval for {opt_name}: [{a_local:.2f}, {b_local:.2f}] (width: {(b_local-a_local):.2f})")
+                    
+                    if yc < yd:
+                        print(f"  f(c)={yc:.3f} < f(d)={yd:.3f}. Discarding [{d_local:.2f}, {b_local:.2f}]")
+                        b_local, d_local, yd = d_local, c_local, yc
+                        c_local = a_local + inv_phi2 * (b_local - a_local)
+                        yc = evaluate_offset_with_optimizer(c_local, opt_name)['loss']
+                    else:
+                        print(f"  f(d)={yd:.3f} <= f(c)={yc:.3f}. Discarding [{a_local:.2f}, {c_local:.2f}]")
+                        a_local, c_local, yc = c_local, d_local, yd
+                        d_local = a_local + inv_phi * (b_local - a_local)
+                        yd = evaluate_offset_with_optimizer(d_local, opt_name)['loss']
         
-        # Lines 376-381: Finalization
-        save_convergence_plot(grid_results)
-        best_res = min(grid_results, key=lambda x: x[1]['loss'])[1]
-        opt_st, opt_pa = apply_gss_theta(torch.from_numpy(best_res['theta_opt']), self.estimation_config, struct, base_state, base_params)
+        # Select best result per optimizer
+        best_results = {}
+        for opt_name in self.optimizers:
+            if optimizer_results[opt_name]:
+                best_res = min(optimizer_results[opt_name], key=lambda x: x[1]['loss'])[1]
+                best_results[opt_name] = best_res
+                
+                # Generate convergence plot for this optimizer
+                if self.config.enable_gss:
+                    save_convergence_plot(
+                        [(off, res) for off, res in optimizer_results[opt_name]],
+                        filename=f"SSE_Stage1_Convergence_{opt_name}.png"
+                    )
         
-        stage1_report_args = (base_params.beta_baseline[:,0,0].detach().numpy(), opt_pa.beta_baseline[:,0,0].detach().numpy(), base_state.E.detach(), opt_st.E.detach(), best_res)
-        
-        # Line 380-381
-        from ..utils.metrics import print_beta_e0_table
-        print_beta_e0_table(*stage1_report_args)
-        print(f"\n>>> GSS Complete. Optimal Offset: {best_res['offset']} days. Best SSE: {best_res['loss']:.3f} <<<")
-        return best_res, struct, stage1_report_args
+        return best_results, struct, all_attempts

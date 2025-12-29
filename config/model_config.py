@@ -1,7 +1,7 @@
 # Libraries to import:
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 @dataclass
 class ModelConfig:
@@ -21,6 +21,16 @@ class ModelConfig:
     seed_region_idx: int = 1
     seed_age_idx: int = 2
     seed_value: float = 1.0
+    
+    scale_factors: Dict[str, float] = field(default_factory=lambda: {
+        "beta": 1.0,
+        "E": 1.0,
+        "IP": 1.0,
+        "ISR": 1.0,
+        "ISH": 1.0,
+        "IA": 1.0,
+        "ihr": 1.0
+    })
     
     def __post_init__(self):
         if self.subpop_names is None:
