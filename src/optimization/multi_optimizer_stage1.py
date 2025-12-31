@@ -66,8 +66,12 @@ class MultiOptimizerStage1:
             # CRITICAL FIX: Define L, A, R in outer scope
             L, A, R = base_params.beta_baseline.shape
             
+            iter_count = [0]
+            
             def loss_and_grad(x_np):
-                theta = torch.from_numpy(x_np).to(torch.float64).detach().requires_grad_(True)
+                theta = torch.from_numpy(x_np).to(torch.float64)
+                theta = torch.clamp(theta, min=-15.0, max=15.0)
+                theta = theta.detach().requires_grad_(True)
                 init_s, par = apply_multi_optimizer_theta(
                     theta, self.estimation_config, struct, base_state, base_params, self.scale_factors
                 )
@@ -103,10 +107,22 @@ class MultiOptimizerStage1:
                 total_loss = fit_loss + total_reg
                 total_loss.backward()
                 
-                return total_loss.item(), theta.grad.detach().numpy().copy(), loss_components.global_r2
+                loss_val = total_loss.item()
+                if not np.isfinite(loss_val):
+                    print(f"ERROR: Non-finite loss: {loss_val}")
+                    iter_count[0] += 1
+                    return 1e12, np.zeros_like(x_np), 0.0
+                
+                grad_np = theta.grad.detach().numpy().copy()
+                if not np.all(np.isfinite(grad_np)):
+                    print(f"WARNING: Non-finite gradients detected")
+                    grad_np = np.nan_to_num(grad_np, nan=0.0, posinf=1e6, neginf=-1e6)
+                
+                iter_count[0] += 1
+                return loss_val, grad_np, loss_components.global_r2
             
-            return loss_and_grad
-        loss_fn = build_loss_fn(truth_data)
+            return loss_and_grad, iter_count
+        loss_fn, iter_count = build_loss_fn(truth_data)
         
         # Generate initial guesses
         def make_initial_guess(randomize=False):
@@ -162,7 +178,7 @@ class MultiOptimizerStage1:
                 
                 # Initial attempt
                 result_initial = self._run_single_attempt(
-                    opt_name, x0, loss_fn, guess_id, "Initial", 0
+                    opt_name, x0, loss_fn, guess_id, "Initial", 0, iter_count
                 )
                 all_attempts.append(result_initial)
                 
@@ -190,7 +206,7 @@ class MultiOptimizerStage1:
                         )
                         
                         result_restart = self._run_single_attempt(
-                            opt_name, restart_x0, loss_fn, guess_id, phase_name, restart_idx+1
+                            opt_name, restart_x0, loss_fn, guess_id, phase_name, restart_idx+1, iter_count
                         )
                         all_attempts.append(result_restart)
                         
@@ -217,10 +233,11 @@ class MultiOptimizerStage1:
         
         return results_df, best_per_optimizer, struct
 
-    def _run_single_attempt(self, optimizer_name, x0, loss_fn, guess_id, phase, restart_num):
+    def _run_single_attempt(self, optimizer_name, x0, loss_fn, guess_id, phase, restart_num, iter_count):
         """Run one optimization attempt"""
         start_time = global_time.time()
         
+        iter_count[0] = 0  # Reset iteration count
         if optimizer_name == "L-BFGS-B":
             res = minimize(
                 lambda x: loss_fn(x)[0],
@@ -291,7 +308,7 @@ class MultiOptimizerStage1:
             'r_squared': final_r2,
             'theta_opt': res.x,
             'duration': duration,
-            'nit': getattr(res, 'nit', 0)
+            'nit': getattr(res, 'nit', iter_count[0])
         }
 
     def _generate_restart_point(self, base_theta, struct, width):

@@ -77,7 +77,9 @@ class IHROptimizer:
                 2. Backward to get gradients
                 3. Return detached loss value and gradients
                 """
-                theta = torch.from_numpy(x_np).to(torch.float64).requires_grad_(True)
+                theta = torch.from_numpy(x_np).to(torch.float64)
+                theta = torch.clamp(theta, min=-15.0, max=15.0)
+                theta = theta.detach().requires_grad_(True)
                 
                 # Apply theta to get IHR parameters
                 par = apply_ihr_theta(theta, params_in, self.scale_factors)

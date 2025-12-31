@@ -31,7 +31,7 @@ class L2MagnitudeRegularization(RegularizationTerm):
         
         # DEBUG: Print penalty magnitude
         if penalty.item() > 0:
-            print(f"L2 penalty for {self.param_name}: {penalty.item():.6f} (lambda={self.lambda_val})")
+            print(f"L2 penalty for {self.param_name}: {penalty.item():.6e} (lambda={self.lambda_val})")
         
         return penalty
 
@@ -93,14 +93,14 @@ class StructuralRegularization(RegularizationTerm):
         )
         
         # CRITICAL FIX: Add debug logging
-        if penalty.item() > 0:
-            print(f"Structural penalty for {self.compartment_name}: {penalty.item():.6f}")
+        if penalty.item() > 1e-10:
+            print(f"Structural penalty for {self.compartment_name}: {penalty.item():.6e}")
             print(f"  On-target lambda: {self.lambda_on}, Off-target lambda: {self.lambda_off}")
             print(f"  Target sum: {self.target_tensor.sum().item():.3f}, Actual sum: {comp_vals.sum().item():.3f}")
             # Print where violations are largest
             max_violation_idx = torch.argmax(torch.abs(comp_vals - self.target_tensor))
             max_violation_val = (comp_vals.flatten()[max_violation_idx] - self.target_tensor.flatten()[max_violation_idx]).item()
-            print(f"  Max violation: {max_violation_val:.6f} at index {max_violation_idx}")
+            print(f"  Max violation: {max_violation_val:.6e} at index {max_violation_idx}")
         
         return penalty
 

@@ -74,7 +74,9 @@ class MultiOptimizerStage2:
         
         def build_loss_fn():
             def loss_and_grad(x_np):
-                theta = torch.from_numpy(x_np).to(torch.float64).detach().requires_grad_(True)
+                theta = torch.from_numpy(x_np).to(torch.float64)
+                theta = torch.clamp(theta, min=-15.0, max=15.0)
+                theta = theta.detach().requires_grad_(True)
                 par = apply_ihr_theta(theta, params_fixed_beta, self.scale_factors)
                 
                 # Update metapop IHR

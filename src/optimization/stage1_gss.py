@@ -4,6 +4,7 @@ import numpy as np
 from scipy.optimize import minimize
 from typing import Dict, List, Tuple
 import copy
+import time as global_time
 
 # Import flu_core inside methods (after environment setup)
 from ..utils.theta_transforms import build_gss_theta_structure, apply_gss_theta
@@ -71,6 +72,7 @@ class GSSOptimizer:
         
         def evaluate_offset_with_optimizer(offset, optimizer_name):
             """Run one optimizer at one offset"""
+            start_time = global_time.time()
             offset = int(round(offset))
             
             # Check if already computed
@@ -143,7 +145,9 @@ class GSSOptimizer:
             
             def loss_fn(x_np):
                 """Loss function that returns (loss, grad)"""
-                theta = torch.from_numpy(x_np).to(torch.float64).detach().requires_grad_(True)
+                theta = torch.from_numpy(x_np).to(torch.float64)
+                theta = torch.clamp(theta, min=-15.0, max=15.0)
+                theta = theta.detach().requires_grad_(True)
                 init_s, par = apply_gss_theta(theta, self.estimation_config, struct, base_state, base_params, self.scale_factors)
                 
                 inputs = metapop_handle.get_flu_torch_inputs()
@@ -183,20 +187,26 @@ class GSSOptimizer:
                 total_loss.backward()
                 
                 # Report progress
+                # Report progress
                 grad_norm = torch.norm(theta.grad).item() if theta.grad is not None else 0.0
                 if self.verbose:
                     print(f"Iter {tracker[0]:03d} | Loss: {total_loss.item():.4f} "
-                        f"(SSE: {fit_loss.item():.4f}, Reg: {total_reg.item():.4f}), "
-                        f"R²: {loss_components.global_r2:.4f}, GradNorm: {grad_norm:.6f}")
+                        f"(SSE: {fit_loss.item():.4f}, Reg: {total_reg.item():.6e}), "
+                        f"R²: {loss_components.global_r2:.4f}, GradNorm: {grad_norm:.6e}")
+                    
+                # CRITICAL FIX: Check for NaN/Inf in loss and gradients
+                loss_val = total_loss.item()
+                if not np.isfinite(loss_val):
+                    print(f"ERROR: Non-finite loss at iter {tracker[0]}: {loss_val}")
+                    return 1e12, np.zeros_like(x_np)  # Return huge loss to signal optimizer
                 
-                # CRITICAL FIX: Check for NaN/Inf gradients
                 grad_np = theta.grad.detach().numpy().copy()
                 if not np.all(np.isfinite(grad_np)):
                     print(f"WARNING: Non-finite gradients detected at iter {tracker[0]}")
                     grad_np = np.nan_to_num(grad_np, nan=0.0, posinf=1e6, neginf=-1e6)
                 
                 tracker[0] += 1
-                return total_loss.item(), grad_np
+                return loss_val, grad_np
             # Run optimizer
             if optimizer_name == "L-BFGS-B":
                 opts = {
@@ -207,25 +217,49 @@ class GSSOptimizer:
                 }
                 if self.verbose:
                     opts['iprint'] = 1
-                res = minimize(
-                    lambda x: loss_fn(x)[0],
-                    x0,
-                    jac=lambda x: loss_fn(x)[1],
-                    method='L-BFGS-B',
-                    options=opts
-                )
+                try:
+                    res = minimize(
+                        lambda x: loss_fn(x)[0],
+                        x0,
+                        jac=lambda x: loss_fn(x)[1],
+                        method='L-BFGS-B',
+                        options=opts
+                    )
+                except Exception as e:
+                    print(f"ERROR: {optimizer_name} failed with: {e}")
+                    # Return dummy result with high loss
+                    res = type('Result', (), {
+                        'x': x0,
+                        'fun': 1e12,
+                        'success': False,
+                        'message': f'Failed: {e}',
+                        'nit': 0
+                    })()
             
             elif optimizer_name == "CG":
                 opts = {'gtol': 1e-04}
                 if self.verbose:
                     opts['disp'] = True
-                res = minimize(
-                    lambda x: loss_fn(x)[0],
-                    x0,
-                    jac=lambda x: loss_fn(x)[1],
-                    method='CG',
-                    options=opts
-                )
+                
+                try:
+                    res = minimize(
+                        lambda x: loss_fn(x)[0],
+                        x0,
+                        jac=lambda x: loss_fn(x)[1],
+                        method='CG',
+                        options=opts
+                    )
+                except Exception as e:
+                    print(f"ERROR: {optimizer_name} failed with: {e}")
+                    # Return dummy result with high loss
+                    res = type('Result', (), {
+                        'x': x0,
+                        'fun': 1e12,
+                        'success': False,
+                        'message': f'Failed: {e}',
+                        'nit': 0
+                    })()
+                
             
             elif optimizer_name == "Adam":
                 # Manual Adam implementation
@@ -240,13 +274,24 @@ class GSSOptimizer:
                     theta.grad = torch.tensor(grad_np)
                     adam_optimizer.step()
                 
-                res = type('Result', (), {
-                    'x': theta.detach().numpy(),
-                    'fun': loss_val,
-                    'success': True,
-                    'message': 'Adam completed',
-                    'nit': 1000
-                })()
+                try:
+                    res = type('Result', (), {
+                        'x': theta.detach().numpy(),
+                        'fun': loss_val,
+                        'success': True,
+                        'message': 'Adam completed',
+                        'nit': 1000
+                    })()
+                except Exception as e:
+                    print(f"ERROR: {optimizer_name} failed with: {e}")
+                    # Return dummy result with high loss
+                    res = type('Result', (), {
+                        'x': x0,
+                        'fun': 1e12,
+                        'success': False,
+                        'message': f'Failed: {e}',
+                        'nit': 0
+                    })()
             
             elif optimizer_name == "least_squares_fd":
                 from scipy.optimize import least_squares
@@ -255,7 +300,18 @@ class GSSOptimizer:
                     loss_val, _ = loss_fn(x_np)
                     return np.array([np.sqrt(max(loss_val, 0.0))])
                 
-                res = least_squares(residuals, x0, jac='2-point', max_nfev=1000)
+                try:
+                    res = least_squares(residuals, x0, jac='2-point', max_nfev=1000)
+                except Exception as e:
+                    print(f"ERROR: {optimizer_name} failed with: {e}")
+                    # Return dummy result with high loss
+                    res = type('Result', (), {
+                        'x': x0,
+                        'fun': 1e12,
+                        'success': False,
+                        'message': f'Failed: {e}',
+                        'nit': 0
+                    })()
                 res.fun = res.cost * 2  # Convert back to loss
             
             else:
@@ -294,11 +350,15 @@ class GSSOptimizer:
                     reg_breakdown[reg_name] = reg_val
                     total_reg_val += reg_val
                 
+                if total_reg_val < 1e-10 and tracker[0] == 0:
+                    print(f"WARNING: Total regularization is very small ({total_reg_val:.6e}). "
+                          f"Check lambda values and parameter scales.")
+                
                 save_regional_aggregate_plot(
                     shifted, shifted_clean, final_p, current_T,
                     filename=f"fit_{optimizer_name}_offset_{offset}.png"
                 )
-            
+            duration = global_time.time() - start_time
             result = {
                 'optimizer': optimizer_name,
                 'offset': offset,
@@ -311,7 +371,8 @@ class GSSOptimizer:
                 'reg_sse': final_components.regional_sse,
                 'reg_r2': final_components.regional_r2,
                 'global_r2': final_components.global_r2,
-                'nit': getattr(res, 'nit', 0)
+                'nit': getattr(res, 'nit', 0),
+                'duration': duration
             }
             
             optimizer_results[optimizer_name].append((offset, result))

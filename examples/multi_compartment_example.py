@@ -31,7 +31,7 @@ def main():
             T=180,
             timesteps_per_day=4,
             mode="BETA_ONLY",  # Not IHR mode, just beta + initial compartments
-            optimizers=["L-BFGS-B", "CG", "Adam"],  # Test multiple optimizers
+            optimizers=["L-BFGS-B", "CG"],  # Test multiple optimizers
             verbose_lbfgs=False,
             verbosity=2,
             loss_aggregation="regional",
