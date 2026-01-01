@@ -138,7 +138,7 @@ def print_multi_compartment_table(true_params, opt_params, compartments, best_de
     # Fit quality summary
     if best_details:
         print(f"\nFIT QUALITY SUMMARY:")
-        print(f"  Global R²: {best_details.get('global_r2', 0.0):.6f}")
+        print(f"  Global R²: {best_details.get('r_squared', best_details.get('global_r2', 0.0)):.6f}")
         print(f"  Total Loss: {best_details.get('loss', 0.0):.3f}")
         if 'reg_breakdown' in best_details:
             print(f"  Regularization Breakdown:")

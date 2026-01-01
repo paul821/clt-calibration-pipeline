@@ -238,18 +238,19 @@ class MultiOptimizerStage1:
         start_time = global_time.time()
         
         iter_count[0] = 0  # Reset iteration count
+        
         if optimizer_name == "L-BFGS-B":
             res = minimize(
-                lambda x: loss_fn(x)[0],
+                lambda x: loss_fn(x)[0],  # Extract loss only
                 x0,
-                jac=lambda x: loss_fn(x)[1],
+                jac=lambda x: loss_fn(x)[1],  # Extract gradient only
                 method='L-BFGS-B',
                 options={
-                    'gtol': 1e-05,      # CRITICAL FIX: tighter tolerance
-                    'ftol': 1e-09,      # CRITICAL FIX: tighter tolerance
-                    'maxiter': 1000,    # CRITICAL FIX: explicit limit
-                    'maxfun': 15000,    # CRITICAL FIX: explicit limit
-                    'maxls': 50         # CRITICAL FIX: more line search attempts
+                    'gtol': 1e-05,
+                    'ftol': 1e-09,
+                    'maxiter': 1000,
+                    'maxfun': 15000,
+                    'maxls': 50
                 }
             )
         
@@ -267,6 +268,7 @@ class MultiOptimizerStage1:
             adam_optimizer = torch.optim.Adam([theta], lr=0.01)
             
             final_loss = 1e12
+            final_r2 = 0.0
             for i in range(1000):
                 adam_optimizer.zero_grad()
                 loss_val, grad_np, r2 = loss_fn(theta.detach().numpy())
@@ -275,12 +277,14 @@ class MultiOptimizerStage1:
                 theta.grad = torch.tensor(grad_np)
                 adam_optimizer.step()
                 final_loss = loss_val
+                final_r2 = r2
             
             res = type('Result', (), {
                 'x': theta.detach().numpy(),
                 'fun': final_loss,
                 'success': True,
-                'nit': 1000
+                'nit': 1000,
+                '_r2': final_r2  # Store R² in result
             })()
         
         elif optimizer_name == "least_squares_fd":
@@ -296,8 +300,13 @@ class MultiOptimizerStage1:
         
         duration = global_time.time() - start_time
         
-        # Final evaluation
-        _, _, final_r2 = loss_fn(res.x)
+        # Final evaluation for R²
+        if hasattr(res, '_r2'):
+            # Adam already computed it
+            final_r2 = res._r2
+        else:
+            # Recompute for other optimizers
+            _, _, final_r2 = loss_fn(res.x)
         
         return {
             'optimizer': optimizer_name,
@@ -306,11 +315,12 @@ class MultiOptimizerStage1:
             'restart_num': restart_num,
             'loss': res.fun,
             'r_squared': final_r2,
+            'global_r2': final_r2,  # Add both for compatibility
             'theta_opt': res.x,
             'duration': duration,
             'nit': getattr(res, 'nit', iter_count[0])
         }
-
+    
     def _generate_restart_point(self, base_theta, struct, width):
         """Generate restart point with noise"""
         theta_new = base_theta.copy()

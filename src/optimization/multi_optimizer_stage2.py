@@ -197,22 +197,28 @@ class MultiOptimizerStage2:
         
         return results_df, best_per_optimizer
     
-    def _run_single_attempt(self, optimizer_name, x0, loss_fn, guess_id, phase, restart_num, ihr_bounds):
+    def _run_single_attempt(self, optimizer_name, x0, loss_fn, guess_id, phase, restart_num, iter_count):
         """Run one optimization attempt"""
         start_time = global_time.time()
         
+        iter_count[0] = 0  # Reset iteration count
+        
         if optimizer_name == "L-BFGS-B":
             res = minimize(
-                lambda x: loss_fn(x)[0],
+                lambda x: loss_fn(x)[0],  # Extract loss only
                 x0,
-                jac=lambda x: loss_fn(x)[1],
+                jac=lambda x: loss_fn(x)[1],  # Extract gradient only
                 method='L-BFGS-B',
-                bounds=ihr_bounds,
-                options={'gtol': 1e-04, 'ftol': 1e-07}
+                options={
+                    'gtol': 1e-05,
+                    'ftol': 1e-09,
+                    'maxiter': 1000,
+                    'maxfun': 15000,
+                    'maxls': 50
+                }
             )
         
         elif optimizer_name == "CG":
-            # CG doesn't support bounds, so we just use unconstrained
             res = minimize(
                 lambda x: loss_fn(x)[0],
                 x0,
@@ -226,6 +232,7 @@ class MultiOptimizerStage2:
             adam_optimizer = torch.optim.Adam([theta], lr=0.01)
             
             final_loss = 1e12
+            final_r2 = 0.0
             for i in range(1000):
                 adam_optimizer.zero_grad()
                 loss_val, grad_np, r2 = loss_fn(theta.detach().numpy())
@@ -233,19 +240,15 @@ class MultiOptimizerStage2:
                     break
                 theta.grad = torch.tensor(grad_np)
                 adam_optimizer.step()
-                
-                # Manual bound enforcement for Adam
-                with torch.no_grad():
-                    for j, (lb, ub) in enumerate(ihr_bounds):
-                        theta[j] = torch.clamp(theta[j], min=lb, max=ub)
-                
                 final_loss = loss_val
+                final_r2 = r2
             
             res = type('Result', (), {
                 'x': theta.detach().numpy(),
                 'fun': final_loss,
                 'success': True,
-                'nit': 1000
+                'nit': 1000,
+                '_r2': final_r2  # Store R² in result
             })()
         
         elif optimizer_name == "least_squares_fd":
@@ -253,10 +256,7 @@ class MultiOptimizerStage2:
                 loss_val, _, _ = loss_fn(x_np)
                 return np.array([np.sqrt(max(loss_val, 0.0))])
             
-            # least_squares supports bounds
-            lb = np.array([b[0] for b in ihr_bounds])
-            ub = np.array([b[1] for b in ihr_bounds])
-            res = least_squares(residuals, x0, jac='2-point', bounds=(lb, ub), max_nfev=1000)
+            res = least_squares(residuals, x0, jac='2-point', max_nfev=1000)
             res.fun = res.cost * 2
         
         else:
@@ -264,8 +264,13 @@ class MultiOptimizerStage2:
         
         duration = global_time.time() - start_time
         
-        # Final evaluation
-        _, _, final_r2 = loss_fn(res.x)
+        # Final evaluation for R²
+        if hasattr(res, '_r2'):
+            # Adam already computed it
+            final_r2 = res._r2
+        else:
+            # Recompute for other optimizers
+            _, _, final_r2 = loss_fn(res.x)
         
         return {
             'optimizer': optimizer_name,
@@ -274,11 +279,11 @@ class MultiOptimizerStage2:
             'restart_num': restart_num,
             'loss': res.fun,
             'r_squared': final_r2,
+            'global_r2': final_r2,  # Add both for compatibility
             'theta_opt': res.x,
             'duration': duration,
-            'nit': getattr(res, 'nit', 0)
+            'nit': getattr(res, 'nit', iter_count[0])
         }
-    
     def _generate_restart_point(self, base_theta, width):
         """Generate restart point with noise around current best"""
         ihr_natural = np.exp(base_theta) / self.scale_factors.get("ihr", 1.0)
