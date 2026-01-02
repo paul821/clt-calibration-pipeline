@@ -1,8 +1,4 @@
-#!/usr/bin/env python3
-"""
-Example: Basic calibration with default settings
-"""
-
+#Example: Basic calibration with default settings
 import sys
 from pathlib import Path
 from datetime import datetime
