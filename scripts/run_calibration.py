@@ -1,9 +1,5 @@
-#!/usr/bin/env python3
-"""
-Main calibration script - Unified pipeline for all modes
-"""
+#Main calibration script - Unified pipeline for all modes
 
-# Libraries to import:
 import torch
 import pandas as pd
 import numpy as np
@@ -17,7 +13,7 @@ from datetime import datetime
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Import config and utilities BEFORE environment setup
+# Import config and utilities before environment setup
 from config.calibration_config import CalibrationConfig, RegularizationConfig
 from config.model_config import ModelConfig
 
@@ -25,10 +21,9 @@ from config.model_config import ModelConfig
 from src.environment import setup_environment
 setup_environment()
 
-# Line 30: warnings filter
 warnings.filterwarnings("ignore", category=UserWarning, message=".*To copy construct from a tensor.*")
 
-# NOW import CLT modules (after environment setup)
+# Import CLT modules (after environment setup)
 import clt_toolkit as clt
 import flu_core as flu
 
@@ -63,9 +58,9 @@ def get_output_prefix(config):
 
 def apply_time_stretching(params, time_stretch_factor):
     """
-    Apply time stretching to transition rates (Professor's approach)
+    Apply time stretching to transition rates
     
-    Divides all transition rates by time_stretch_factor to elongate epidemic dynamics
+    Divides all transition rates by time_stretch_factor to potentially elongate epidemic dynamics
     """
     stretched_params = clt.updated_dataclass(params, {
         attr: getattr(params, attr) / time_stretch_factor
@@ -77,8 +72,6 @@ def apply_time_stretching(params, time_stretch_factor):
 def load_model_components(model_config: ModelConfig, calib_config: CalibrationConfig):
     """
     Load and initialize model components
-    
-    Migrated from lines 414-428 of professor's code
     """
     p_root = clt.utils.PROJECT_ROOT
     t_path = model_config.texas_input_path or p_root / "flu_instances/texas_input_files"
@@ -168,7 +161,7 @@ def run_ihr_mode(
     truth_data_15ch: torch.Tensor
 ):
     """
-    Run IHR_MODE calibration (Professor's GSS approach with multi-optimizer support)
+    Run IHR_MODE calibration
     
     Two stages:
         Stage 1: Beta + initial compartments (with optional GSS offset discovery)
@@ -180,7 +173,7 @@ def run_ihr_mode(
     
     prefix = get_output_prefix(calib_config)
     
-    # ===== STAGE 1: Beta + Initial Compartments =====
+    # Stage 1
     print("\n### STAGE 1: TRANSMISSION & SEEDING ###")
     
     gss_optimizer = GSSOptimizer(
@@ -323,7 +316,7 @@ def run_ihr_mode(
         prefix=prefix
     )
     
-    # ===== STAGE 2: IHR =====
+    # Stage 2
     print("\n### STAGE 2: INFECTION-HOSPITALIZATION RATE ###")
     
     ihr_optimizer = IHROptimizer(
@@ -427,7 +420,7 @@ def run_multi_optimizer_mode(
     truth_data_15ch: torch.Tensor
 ):
     """
-    Run multi-optimizer calibration (your suite approach with professor's improvements)
+    Run multi-optimizer calibration 
     
     Used for modes: BETA_ONLY, SEQUENTIAL
     """
@@ -437,7 +430,7 @@ def run_multi_optimizer_mode(
     
     prefix = get_output_prefix(calib_config)
     
-    # ===== STAGE 1: Beta + Initial Compartments =====
+    # Stage 1
     print("\n### STAGE 1: TRANSMISSION & SEEDING ###")
     
     multi_opt_s1 = MultiOptimizerStage1(
@@ -526,7 +519,7 @@ def run_multi_optimizer_mode(
         prefix=prefix
     )
     
-    # ===== STAGE 2: IHR (if SEQUENTIAL mode) =====
+    # Stage 2
     if calib_config.mode == "SEQUENTIAL":
         print("\n### STAGE 2: INFECTION-HOSPITALIZATION RATE ###")
         
