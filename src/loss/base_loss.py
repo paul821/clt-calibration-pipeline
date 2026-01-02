@@ -1,4 +1,3 @@
-# Libraries to import:
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 import torch
@@ -9,7 +8,7 @@ class LossComponents:
     """Container for loss function components"""
     total_loss: float
     sse: float
-    regularization: Dict[str, float]  # e.g., {"beta_l2": 0.5, "E_structural": 2.3}
+    regularization: Dict[str, float]  #{"beta_l2": 0.5, "E_structural": 2.3}
     global_r2: float
     regional_r2: List[float]
     regional_sse: List[float]
@@ -48,7 +47,7 @@ class LossFunction:
         if verbosity == 0:
             return
         elif verbosity == 1:
-            print(f"Iter {self.iteration_count:03d} | Loss: {components.total_loss:.4f}, R²: {components.global_r2:.4f}")
+            print(f"Iter {self.iteration_count:03d} | Loss: {components.total_loss:.4f}, R2: {components.global_r2:.4f}")
         elif verbosity >= 2:
             print(f"\n{'='*60}")
             print(f"Iteration {self.iteration_count}")
