@@ -10,9 +10,8 @@ from ..loss.regional_loss import RegionalLossFunction
 
 class IHROptimizer:
     """
-    IHR optimizer for Stage 2 (Professor's approach with multi-optimizer support)
+    IHR optimizer for Stage 2
     
-    ENHANCEMENTS:
     - Supports multiple optimizers (L-BFGS-B, CG, Adam, least_squares_fd)
     - Location-age loss aggregation (15-channel)
     """
@@ -68,14 +67,6 @@ class IHROptimizer:
             def loss_fn(x_np):
                 """
                 Loss function returning (loss, grad)
-                
-                CRITICAL FIX: We need to compute gradients w.r.t. theta (IHR params)
-                but metapop.get_flu_torch_inputs() doesn't like gradient-enabled tensors.
-                
-                Solution: 
-                1. Forward pass with gradient-enabled theta to compute loss
-                2. Backward to get gradients
-                3. Return detached loss value and gradients
                 """
                 theta = torch.from_numpy(x_np).to(torch.float64)
                 theta = torch.clamp(theta, min=-15.0, max=15.0)
@@ -84,8 +75,7 @@ class IHROptimizer:
                 # Apply theta to get IHR parameters
                 par = apply_ihr_theta(theta, params_in, self.scale_factors)
                 
-                # Update metapop with DETACHED parameters for simulation
-                # (metapop internals don't like gradient-enabled tensors)
+                # Update metapop with detached parameters for simulation
                 metapop._full_metapop_params_tensors.IP_to_ISH_prop = par.IP_to_ISH_prop.detach()
                 for i, sub in enumerate(metapop.subpop_models.values()):
                     sub.params = clt.updated_dataclass(
@@ -93,11 +83,8 @@ class IHROptimizer:
                         {"IP_to_ISH_prop": par.IP_to_ISH_prop.detach()[i]}
                     )
                 
-                # Get inputs (this will work now with detached params)
                 inputs = metapop.get_flu_torch_inputs()
                 
-                # But for the actual simulation that needs gradients, use par directly
-                # We'll simulate with gradient-enabled params
                 pred = flu.torch_simulate_hospital_admits(
                     state_t0, 
                     par,  # Use gradient-enabled params here
@@ -116,7 +103,7 @@ class IHROptimizer:
                 # Extract gradient
                 grad = theta.grad.detach().numpy().copy() if theta.grad is not None else np.zeros_like(x_np)
                 
-                # Compute R² for reporting (detached)
+                # Compute R2 for reporting (detached)
                 with torch.no_grad():
                     loss_components = loss_fn_obj(pred.detach(), truth_15ch)
                 
