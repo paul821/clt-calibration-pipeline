@@ -1,7 +1,4 @@
-#!/usr/bin/env python3
-"""
-Example: IHR MODE calibration (Professor's GSS approach with multi-optimizer)
-"""
+#IHR Mode calibration
 
 import sys
 from pathlib import Path
@@ -63,8 +60,8 @@ def main():
                     "type": "structural",
                     "location_targets": [0.0, 1.0, 0.0],  # Seed only in location 1
                     "age_targets": [0, 0, 1, 0, 0],       # Only age group 2 (18-49)
-                    "lambda_on_target": 100000.0,  # CRITICAL FIX: was 10.0
-                    "lambda_off_target": 100000.0  # CRITICAL FIX: was 10.0
+                    "lambda_on_target": 100000.0,  
+                    "lambda_off_target": 100000.0  
                 }
             }
         )
