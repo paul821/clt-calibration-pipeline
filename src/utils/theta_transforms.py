@@ -1,4 +1,3 @@
-# Libraries to import:
 import torch
 import copy
 import numpy as np
@@ -6,10 +5,10 @@ from typing import Dict, Tuple
 
 def build_gss_theta_structure(config, base_state, base_params):
     """
-    Build theta structure for GSS Stage 1 (Professor's approach)
+    Build theta structure for GSS Stage 1
     
     Returns dict with:
-        - "slices": dict mapping parameter family → slice in theta
+        - "slices": dict mapping parameter family to slice in theta
         - "size": total length of theta vector
     """
     L, A, R = base_params.beta_baseline.shape
@@ -40,7 +39,7 @@ def build_gss_theta_structure(config, base_state, base_params):
 
 def apply_gss_theta(theta, config, structure, base_state, base_params, scale_factors):
     """
-    Apply theta vector to create state and params (Professor's approach with log-space)
+    Apply theta vector to create state and params
     
     Args:
         theta: torch.Tensor (log-scaled parameters)
@@ -56,7 +55,6 @@ def apply_gss_theta(theta, config, structure, base_state, base_params, scale_fac
     L, A, R = base_params.beta_baseline.shape
     slices = structure["slices"]
     
-    # --- Beta ---
     s_beta = slices["beta"]
     theta_beta = theta[s_beta]
     # theta stores log(beta * scale)
@@ -72,7 +70,6 @@ def apply_gss_theta(theta, config, structure, base_state, base_params, scale_fac
     params = copy.deepcopy(base_params)
     params.beta_baseline = beta_tensor.double()
     
-    # --- Initial compartments ---
     init_state = copy.deepcopy(base_state)
     
     for comp_name, do_est in config["estimate_initial"].items():
@@ -131,11 +128,9 @@ def apply_ihr_theta(theta, base_params, scale_factors):
 
 def build_multi_optimizer_theta_structure(config, base_state, base_params):
     """
-    Build theta structure for multi-optimizer suite (your approach + professor's improvements)
+    Build theta structure for multi-optimizer suite
     
     Handles beta, IHR, and multiple initial compartments
-    
-    FIX: Ensure correct sizing for beta based on beta_param
     """
     L, A, R = base_params.beta_baseline.shape
     slices = {}
@@ -187,9 +182,8 @@ def build_multi_optimizer_theta_structure(config, base_state, base_params):
     
 def apply_multi_optimizer_theta(theta, config, structure, base_state, base_params, scale_factors):
     """
-    Apply theta for multi-optimizer suite (unified with professor's log-space approach)
+    Apply theta for multi-optimizer suite
     
-    FIX: Properly handle theta slicing for beta and compartments
     """
     if isinstance(theta, np.ndarray):
         theta = torch.from_numpy(theta).to(torch.float64)
