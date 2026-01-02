@@ -1,4 +1,3 @@
-# Libraries to import:
 import torch
 import numpy as np
 from scipy.optimize import minimize, least_squares
@@ -12,7 +11,7 @@ from ..loss.regional_loss import RegionalLossFunction
 
 class MultiOptimizerStage2:
     """
-    Multi-optimizer suite for Stage 2 IHR estimation (your approach)
+    Multi-optimizer suite for Stage 2 IHR estimation 
     
     Used when Stage 1 beta/initial compartments are already fixed.
     
@@ -248,7 +247,7 @@ class MultiOptimizerStage2:
                 'fun': final_loss,
                 'success': True,
                 'nit': 1000,
-                '_r2': final_r2  # Store R² in result
+                '_r2': final_r2  # Store R2 in result
             })()
         
         elif optimizer_name == "least_squares_fd":
@@ -264,7 +263,7 @@ class MultiOptimizerStage2:
         
         duration = global_time.time() - start_time
         
-        # Final evaluation for R²
+        # Final evaluation for R2
         if hasattr(res, '_r2'):
             # Adam already computed it
             final_r2 = res._r2
