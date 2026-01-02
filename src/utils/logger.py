@@ -1,11 +1,10 @@
-# Libraries to import:
 import sys
 from pathlib import Path
 from datetime import datetime
 
 class ConsoleLogger:
     """
-    Tee-style logger that writes to both console and file
+    Logger that writes to both console and file
     """
     def __init__(self, log_file=None):
         self.terminal = sys.stdout
