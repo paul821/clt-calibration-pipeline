@@ -1,4 +1,3 @@
-# Libraries to import:
 import torch
 import numpy as np
 from scipy.optimize import minimize, least_squares
@@ -12,7 +11,7 @@ from ..loss.regularization import build_regularization_terms
 
 class MultiOptimizerStage1:
     """
-    Multi-optimizer suite for Stage 1 (your approach + professor's improvements)
+    Multi-optimizer suite for Stage 1
     
     Used for non-IHR modes: BETA_ONLY, or beta + initial compartments
     
@@ -63,7 +62,6 @@ class MultiOptimizerStage1:
         
         # Build loss function
         def build_loss_fn(observed_data):
-            # CRITICAL FIX: Define L, A, R in outer scope
             L, A, R = base_params.beta_baseline.shape
             
             iter_count = [0]
@@ -130,7 +128,7 @@ class MultiOptimizerStage1:
             
             if "beta" in struct["slices"]:
                 s_beta = struct["slices"]["beta"]
-                # CRITICAL FIX: Use true beta values as starting point
+
                 true_betas = base_params.beta_baseline[:, 0, 0].detach().cpu().numpy()
                 if randomize:
                     jitter = np.random.uniform(0.7, 1.3, size=len(true_betas))
@@ -155,7 +153,6 @@ class MultiOptimizerStage1:
                     jitter = np.random.uniform(0.5, 2.0, size=comp0.shape[0])
                     theta0[s_comp] = np.log((comp0 * jitter) * comp_scale)
                 else:
-                    # CRITICAL FIX: Use true values, not zeros
                     theta0[s_comp] = np.log(np.maximum(comp0, 1e-12) * comp_scale)
                 
             return theta0
@@ -284,7 +281,7 @@ class MultiOptimizerStage1:
                 'fun': final_loss,
                 'success': True,
                 'nit': 1000,
-                '_r2': final_r2  # Store R² in result
+                '_r2': final_r2  # Store R2 in result
             })()
         
         elif optimizer_name == "least_squares_fd":
@@ -300,7 +297,7 @@ class MultiOptimizerStage1:
         
         duration = global_time.time() - start_time
         
-        # Final evaluation for R²
+        # Final evaluation for R2
         if hasattr(res, '_r2'):
             # Adam already computed it
             final_r2 = res._r2
