@@ -1,4 +1,3 @@
-# Libraries to import:
 import numpy as np
 import torch
 from typing import Dict, List, Optional
@@ -23,11 +22,11 @@ def generate_stage1_report(
     
     Args:
         true_params: dict with true parameter values
-        best_results: dict mapping optimizer name → best result
+        best_results: dict mapping optimizer name to best result
         structure: theta structure
         scale_factors: scale factors
         truth_data: truth admissions data
-        predictions_dict: dict mapping optimizer name → predictions
+        predictions_dict: dict mapping optimizer name to predictions
         config: CalibrationConfig
     """
     print("\n" + "="*100)
@@ -88,9 +87,9 @@ def generate_stage2_report(
     
     Args:
         true_ihrs: true IHR values (L, A, R)
-        best_results: dict mapping optimizer name → best result
+        best_results: dict mapping optimizer name to best result
         truth_data: truth admissions data (T, L, A, R)
-        predictions_dict: dict mapping optimizer name → predictions
+        predictions_dict: dict mapping optimizer name to predictions
         config: CalibrationConfig
     """
     print("\n" + "="*100)
