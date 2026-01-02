@@ -1,7 +1,4 @@
-#!/usr/bin/env python3
-"""
-Example: Multi-compartment calibration with multiple optimizers
-"""
+#Example: Multi-compartment calibration with multiple optimizers
 
 import sys
 from pathlib import Path
@@ -66,12 +63,12 @@ def main():
                     "type": "structural",
                     "location_targets": [0.0, 1.0, 0.0],
                     "age_targets": [0, 0, 1, 0, 0],
-                    "lambda_on_target": 100000.0,  # CRITICAL FIX
-                    "lambda_off_target": 100000.0  # CRITICAL FIX
+                    "lambda_on_target": 100000.0,  
+                    "lambda_off_target": 100000.0  
                 },
                 "IP": {
                     "type": "l2_magnitude",
-                    "lambda": 1e-8  # CRITICAL FIX: was 1e-3
+                    "lambda": 1e-8 
                 }
             }
         )
