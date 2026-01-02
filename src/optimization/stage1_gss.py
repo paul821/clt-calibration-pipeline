@@ -1,4 +1,3 @@
-# Libraries to import:
 import torch
 import numpy as np
 from scipy.optimize import minimize
@@ -6,7 +5,6 @@ from typing import Dict, List, Tuple
 import copy
 import time as global_time
 
-# Import flu_core inside methods (after environment setup)
 from ..utils.theta_transforms import build_gss_theta_structure, apply_gss_theta
 from ..utils.metrics import format_iter_report
 from ..visualization.plotting import save_convergence_plot, save_regional_aggregate_plot
@@ -15,10 +13,9 @@ from ..loss.regularization import build_regularization_terms
 
 class GSSOptimizer:
     """
-    Golden Section Search optimizer for Stage 1 (Professor's approach)
+    Golden Section Search optimizer for Stage 1 
     
-    ENHANCEMENTS:
-    - Supports multiple initial compartments (not just E0)
+    - Supports multiple initial compartments 
     - Supports multiple optimizers (L-BFGS-B, CG, Adam, least_squares_fd)
     - Regional loss decomposition with structured regularization
     """
@@ -36,7 +33,7 @@ class GSSOptimizer:
         Main GSS optimization routine with multi-optimizer support
         
         Returns:
-            best_results: dict with keys per optimizer (e.g., {"L-BFGS-B": {...}, "CG": {...}})
+            best_results: dict with keys per optimizer ({"L-BFGS-B": {...}, "CG": {...}})
             struct: theta structure
             all_attempts: list of all optimization attempts across all offsets and optimizers
         """
@@ -90,7 +87,6 @@ class GSSOptimizer:
                 x0 = closest[1]['theta_opt'].copy()
                 print(f"Warm-starting from offset {closest[0]}")
             else:
-                # CRITICAL FIX: Initialize from scaled true values, not zeros
                 x0 = np.zeros(struct["size"])
                 L, A, R = base_params.beta_baseline.shape
                 slices = struct["slices"]
@@ -111,7 +107,7 @@ class GSSOptimizer:
                     # Initialize with small value in seeded location, near-zero elsewhere
                     L, A, R = base_params.beta_baseline.shape
                     e0_init = np.zeros(L * A * R)
-                    # Seed location 1, age 2 (index 1*5 + 2 = 7)
+                    # Seed location 1, age 2 (index 1*5 + 2 = 7). Subject to change
                     seed_idx = 1 * A + 2  # Loc 1, Age 2
                     e0_init[seed_idx] = 1.0  # Single seeded compartment
                     x0[s_e] = np.log((e0_init + 1e-12) * self.scale_factors["E"])
@@ -140,7 +136,6 @@ class GSSOptimizer:
             # Build loss function for this offset
             tracker = [0]
             
-            # CRITICAL FIX: Define L, A, R in outer scope so loss_fn can access them
             L, A, R = base_params.beta_baseline.shape
             
             def loss_fn(x_np):
@@ -187,14 +182,12 @@ class GSSOptimizer:
                 total_loss.backward()
                 
                 # Report progress
-                # Report progress
                 grad_norm = torch.norm(theta.grad).item() if theta.grad is not None else 0.0
                 if self.verbose:
                     print(f"Iter {tracker[0]:03d} | Loss: {total_loss.item():.4f} "
                         f"(SSE: {fit_loss.item():.4f}, Reg: {total_reg.item():.6e}), "
                         f"R²: {loss_components.global_r2:.4f}, GradNorm: {grad_norm:.6e}")
                     
-                # CRITICAL FIX: Check for NaN/Inf in loss and gradients
                 loss_val = total_loss.item()
                 if not np.isfinite(loss_val):
                     print(f"ERROR: Non-finite loss at iter {tracker[0]}: {loss_val}")
@@ -210,10 +203,10 @@ class GSSOptimizer:
             # Run optimizer
             if optimizer_name == "L-BFGS-B":
                 opts = {
-                    'gtol': 1e-05,      # CRITICAL FIX: was 1e-04, too loose
-                    'ftol': 1e-09,      # CRITICAL FIX: was 1e-07, too loose
-                    'maxiter': 1000,    # CRITICAL FIX: add explicit max iterations
-                    'maxfun': 15000     # CRITICAL FIX: add max function evaluations
+                    'gtol': 1e-05,      
+                    'ftol': 1e-09,     
+                    'maxiter': 1000,    
+                    'maxfun': 15000   
                 }
                 if self.verbose:
                     opts['iprint'] = 1
