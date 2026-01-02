@@ -1,9 +1,7 @@
-# Libraries to import:
 import os
 import sys
 import subprocess
 
-# Migrate entire function (lines 23-28):
 def setup_environment():
     repo_dir = "CLT_BaseModel"
     if not os.path.exists(repo_dir):
