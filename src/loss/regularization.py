@@ -1,4 +1,3 @@
-# Libraries to import:
 import torch
 import numpy as np
 from typing import Dict, List, Optional
@@ -24,12 +23,8 @@ class L2MagnitudeRegularization(RegularizationTerm):
             return torch.tensor(0.0, dtype=torch.float64)
         
         param = theta_dict[self.param_name]
-        # CRITICAL FIX: L2 on log-space values, not natural-space
-        # (theta_dict contains natural-space values, we need log-space for proper L2)
-        # Actually, no - we want L2 on natural space to penalize large natural values
         penalty = self.lambda_val * torch.sum(param ** 2)
         
-        # DEBUG: Print penalty magnitude
         if penalty.item() > 0:
             print(f"L2 penalty for {self.param_name}: {penalty.item():.6e} (lambda={self.lambda_val})")
         
@@ -37,7 +32,7 @@ class L2MagnitudeRegularization(RegularizationTerm):
 
 class StructuralRegularization(RegularizationTerm):
     """
-    Structural regularization for initial compartments (Professor's approach)
+    Structural regularization for initial compartments
     
     Enforces sparsity patterns: penalizes deviations from target values
     at specific (location, age) indices.
@@ -92,7 +87,6 @@ class StructuralRegularization(RegularizationTerm):
             self.weight_tensor * (comp_vals - self.target_tensor)**2
         )
         
-        # CRITICAL FIX: Add debug logging
         if penalty.item() > 1e-10:
             print(f"Structural penalty for {self.compartment_name}: {penalty.item():.6e}")
             print(f"  On-target lambda: {self.lambda_on}, Off-target lambda: {self.lambda_off}")
@@ -106,7 +100,7 @@ class StructuralRegularization(RegularizationTerm):
 
 def build_regularization_terms(
     config,
-    shape_dict: Dict[str, tuple]  # e.g., {"beta": (L,), "E": (L, A, R)}
+    shape_dict: Dict[str, tuple]  #{"beta": (L,), "E": (L, A, R)}
 ) -> Dict[str, RegularizationTerm]:
     """
     Build all regularization terms from config
