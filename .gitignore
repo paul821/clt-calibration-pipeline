@@ -40,7 +40,7 @@ env/
 dist/
 build/
 
-# External dependencies (cloned automatically)
+# External dependencies
 CLT_BaseModel/
 
 # Output files
