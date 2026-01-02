@@ -116,12 +116,6 @@ python examples/ihr_mode_example.py
 
 # Multi-compartment
 python examples/multi_compartment_example.py
-
-# Time stretching comparison
-python examples/time_stretching_comparison.py
-
-# Noise robustness test
-python examples/noise_robustness_test.py
 ```
 
 ## Configuration Guide
