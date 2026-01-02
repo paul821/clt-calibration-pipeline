@@ -1,10 +1,9 @@
-# Libraries to import:
 import torch
 import numpy as np
 
 def format_iter_report(pred, truth, subpop_truths, iteration_count, g_norm=None, sse_obj=None, verbose=True):
     """
-    Format and print iteration report (Professor's style)
+    Format and print iteration report
     
     Args:
         pred: predicted admissions (T, L, A, R)
@@ -45,9 +44,7 @@ def format_iter_report(pred, truth, subpop_truths, iteration_count, g_norm=None,
 
 def print_beta_e0_table(true_betas, opt_betas, true_e0, opt_e0, best_probe_details=None):
     """
-    Print Stage 1 Beta & E0 parameter recovery table (Professor's style)
-    
-    FULL PASTE from professor's code (lines 111-139)
+    Print Stage 1 Beta & E0 parameter recovery table 
     """
     print(f"\n>>> STAGE 1: BETA & E0 PARAMETER RECOVERY <<<")
     print("="*105)
@@ -79,8 +76,8 @@ def print_multi_compartment_table(true_params, opt_params, compartments, best_de
     Print multi-compartment parameter recovery table (NEW - enhanced version)
     
     Args:
-        true_params: dict mapping compartment name → true values (L, A, R) or (L,)
-        opt_params: dict mapping compartment name → optimized values
+        true_params: dict mapping compartment name to true values (L, A, R) or (L,)
+        opt_params: dict mapping compartment name to optimized values
         compartments: list of compartment names to display
         best_details: optional dict with fit quality metrics
     """
@@ -149,9 +146,9 @@ def print_multi_compartment_table(true_params, opt_params, compartments, best_de
 
 def print_results_table(label, true_ihrs, opt_ihrs, truth_data, pred_data):
     """
-    Print IHR calibration results table (Professor's style)
+    Print IHR calibration results table
     
-    FIXED: Handle both per-location (L) and per-location-age (L*A) IHR
+    Handle both per-location (L) and per-location-age (L*A) IHR
     """
     print(f"\n>>> {label} <<<")
     print("="*80)
