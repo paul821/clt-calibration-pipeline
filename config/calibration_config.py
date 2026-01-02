@@ -1,4 +1,3 @@
-# Libraries to import:
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -8,44 +7,24 @@ class RegularizationConfig:
     
     # Beta regularization (magnitude-based)
     beta_type: str = "l2_magnitude"  # "l2_magnitude" or "none"
-    beta_lambda: float = 1e-6  # CRITICAL FIX: was 1e-2, too large for log-space
+    beta_lambda: float = 1e-6  #1e-2 was too large for log-space
     
-    # Compartment regularization (can be structural or magnitude)
+    # Compartment regularization
     compartment_configs: Dict[str, Dict] = field(default_factory=dict)
-    # Example:
-    # {
-    #     "E": {
-    #         "type": "structural",
-    #         "location_targets": [0.0, 1.0, 0.0],  # which locations seeded
-    #         "age_targets": [0, 0, 1, 0, 0],       # which ages seeded (one-hot)
-    #         "lambda_on_target": 100000.0,  # CRITICAL FIX: was 10.0, had no effect
-    #         "lambda_off_target": 100000.0  # CRITICAL FIX: was 10.0, had no effect
-    #     },
-    #     "IP": {
-    #         "type": "l2_magnitude",
-    #         "lambda": 1e-3
-    #     }
-    # }
 
 @dataclass
 class CalibrationConfig:
     """Configuration for calibration parameters"""
     
-    # From lines 27-29 (professor's code)
     T: int = 180
     timesteps_per_day: int = 4
     
-    # Random seeds
     torch_seed: int = 0
     numpy_seed: int = 0
     
     # Calibration mode
     mode: str = "SEQUENTIAL"  # "BETA_ONLY", "IHR_ONLY", "SEQUENTIAL", "IHR_MODE"
     
-    # IHR_MODE: Uses professor's GSS + regional loss approach
-    # SEQUENTIAL: Your multi-optimizer suite approach
-    
-    # Optimizer selection
     optimizers: List[str] = field(default_factory=lambda: ["L-BFGS-B"])
     # Options: "L-BFGS-B", "CG", "Adam", "least_squares_fd"
     
@@ -66,8 +45,7 @@ class CalibrationConfig:
     # "location_age": sum of per-(location,age) SSE (Stage 2 style)
     # "global": single global SSE (legacy)
     
-    # Time stretching (professor's approach)
-    time_stretch_factor: float = 1.0  # Set to 5.0 for professor's time-stretching
+    time_stretch_factor: float = 1.0  
     apply_time_stretch: bool = False
     
     # Noise injection for robustness testing
@@ -79,11 +57,6 @@ class CalibrationConfig:
     
     # Estimation configuration
     estimation_config: Dict = field(default_factory=dict)
-    # {
-    #     "beta_param": "L" or "LA",
-    #     "estimate_initial": {"E": True, "IP": False, ...},
-    #     "ihr_param": "L" or "LAR"  (only for IHR mode)
-    # }
     
     # Regularization
     regularization: RegularizationConfig = field(default_factory=RegularizationConfig)
