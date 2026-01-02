@@ -11,19 +11,19 @@ A modular, multi-optimizer calibration framework for the CLT_BaseModel with supp
 
 ## Features
 
-### IHR Mode (Professor's Approach)
-- **Stage 1**: Transmission rate (β) and initial compartments (E₀, IP₀, etc.) with optional GSS offset discovery
+### IHR Mode
+- **Stage 1**: Transmission rate (Beta) and initial compartments (E0, IP0, etc.) with optional GSS offset discovery
 - **Stage 2**: Age-stratified infection-hospitalization rates (IHR)
 - Regional loss decomposition preserves location-specific signals
 - Structured regularization prevents misassigned epidemic seeding
 
-### Multi-Optimizer Mode (Your Suite)
+### Multi-Optimizer Mode
 - Run multiple optimizers simultaneously for comparison
-- Restart strategy: Wide → Medium → Narrow search phases
+- Restart strategy: Wide, Medium, Narrow search phases
 - Warm-starting between restart phases for efficiency
 - Comprehensive reporting and visualization
 
-### Key Innovations
+### Key Mechanisms
 1. **Log-space parameterization** for all parameters (guarantees positivity)
 2. **Regional SSE decomposition** (not global MSE) for better gradients
 3. **Structural regularization** for initial compartments (not just magnitude penalties)
@@ -170,7 +170,7 @@ config.regularization = RegularizationConfig(
 ## Output Files
 
 ### Plots
-- `stage1_optimizer_comparison.png`: Bar charts comparing loss/R²/runtime
+- `stage1_optimizer_comparison.png`: Bar charts comparing loss/R2/runtime
 - `stage1_loss_breakdown.png`: Stacked bars showing data fit vs regularization
 - `stage1_parameter_recovery.png`: True vs estimated parameters
 - `calibration_15_panel.png`: 15-panel (3 locations × 5 ages) fit quality
@@ -180,7 +180,7 @@ config.regularization = RegularizationConfig(
 ### Console Output
 - Optimizer comparison tables
 - Parameter recovery tables (beta, E0, IP0, etc.)
-- Fit quality metrics (SSE, R², per location and global)
+- Fit quality metrics (SSE, R2, per location and global)
 - Loss component breakdown (data fit + regularization)
 
 ## Project Structure
