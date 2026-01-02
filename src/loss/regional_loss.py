@@ -1,4 +1,3 @@
-# Libraries to import:
 import torch
 import numpy as np
 from typing import Optional, Dict, List
@@ -6,7 +5,7 @@ from .base_loss import LossFunction, LossComponents
 
 class RegionalLossFunction(LossFunction):
     """
-    Regional loss decomposition (Professor's approach)
+    Regional loss decomposition
     
     Computes SSE per location, then sums. Preserves regional structure
     for better identifiability and interpretability.
@@ -64,14 +63,14 @@ class RegionalLossFunction(LossFunction):
         """
         Compute global and regional R² values
         """
-        # Global R²
+        # Global R2
         obs_flat = obs.sum(dim=(1, 2, 3))
         pred_flat = pred.sum(dim=(1, 2, 3))
         ss_tot_global = torch.sum((obs_flat - torch.mean(obs_flat))**2).item()
         ss_res_global = torch.sum((obs_flat - pred_flat)**2).item()
         global_r2 = 1.0 - (ss_res_global / ss_tot_global) if ss_tot_global > 0 else 0.0
         
-        # Regional R² (per location)
+        # Regional R2 (per location)
         obs_regional = obs.sum(dim=(-2, -1))  # (T, L)
         pred_regional = pred.sum(dim=(-2, -1))
         
