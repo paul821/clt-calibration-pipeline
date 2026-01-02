@@ -1,4 +1,3 @@
-# Libraries to import:
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -6,9 +5,7 @@ from typing import Dict, List, Optional
 
 def save_convergence_plot(grid_results, filename="SSE_Stage1_Convergence.png", prefix=""):
     """
-    SSE vs Offset Visualization with Global R² (Professor's style)
-    
-    FULL PASTE from professor's code (lines 54-80) with filename parameter
+    SSE vs Offset Visualization with Global R2
     """
     if not grid_results:
         return
@@ -44,9 +41,7 @@ def save_convergence_plot(grid_results, filename="SSE_Stage1_Convergence.png", p
 
 def save_regional_aggregate_plot(truth_noisy, truth_clean, opt_pred, current_T, filename="calibration_regional_aggregate.png", prefix=""):
     """
-    Aggregate plot with uniform styling (Professor's style)
-    
-    FULL PASTE from professor's code (lines 82-111) with modifications for filenames
+    Aggregate plot with uniform styling
     """
     if prefix:
         filename = prefix + filename
@@ -89,9 +84,7 @@ def save_regional_aggregate_plot(truth_noisy, truth_clean, opt_pred, current_T, 
 
 def save_diagnostic_plots(truth_noisy, truth_clean, opt_pred, current_T, age_labels=None, prefix=""):
     """
-    15-panel diagnostic plot (Professor's style)
-    
-    FULL PASTE from professor's code (lines 246-280) with age_labels parameter
+    15-panel diagnostic plot
     """
     if age_labels is None:
         age_labels = ["0-4", "5-17", "18-49", "50-64", "65+"]
@@ -127,10 +120,10 @@ def save_diagnostic_plots(truth_noisy, truth_clean, opt_pred, current_T, age_lab
 
 def plot_multi_optimizer_comparison(results_dict: Dict, stage_name: str = "Stage 1", save_path: str = None, prefix: str = ""):
     """
-    Plot comparison of multiple optimizers (NEW)
+    Plot comparison of multiple optimizers
     
     Args:
-        results_dict: dict mapping optimizer name → result dict with 'loss', 'r_squared', 'duration'
+        results_dict: dict mapping optimizer name to result dict with 'loss', 'r_squared', 'duration'
         stage_name: "Stage 1" or "Stage 2"
         save_path: optional save path
     """
@@ -193,12 +186,12 @@ def plot_parameter_recovery_bars(
     prefix: str = ""
 ):
     """
-    Bar chart comparing true vs optimized parameters across multiple optimizers (NEW - ENHANCED)
+    Bar chart comparing true vs optimized parameters across multiple optimizers
     
     Args:
-        true_params: dict mapping param name → true values (e.g., {"beta": [0.22, 0.28, 0.25]})
-        opt_params_dict: dict mapping optimizer name → dict of param name → optimized values
-        param_names: list of parameter names to plot (e.g., ["beta", "E"])
+        true_params: dict mapping param name to true values (e.g., {"beta": [0.22, 0.28, 0.25]})
+        opt_params_dict: dict mapping optimizer name to dict of param name then to optimized values
+        param_names: list of parameter names to plot (["beta", "E"])
         save_path: path to save figure
     """
     if prefix and not save_path.startswith(prefix):
@@ -217,7 +210,7 @@ def plot_parameter_recovery_bars(
         
         true_vals = true_params.get(param_name, np.array([]))
         if true_vals.ndim > 1:
-            # For multi-dimensional params (e.g., E with shape (L, A, R)), aggregate
+            # For multi-dimensional params (like E with shape (L, A, R)), aggregate
             true_vals = true_vals.sum(axis=tuple(range(1, true_vals.ndim)))  # Sum over non-location dims
         
         n_values = len(true_vals)
@@ -263,11 +256,11 @@ def plot_compartment_timeseries(
     prefix: str = ""
 ):
     """
-    Plot compartment trajectories for multiple optimizers (NEW)
+    Plot compartment trajectories for multiple optimizers
     
     Args:
         truth_clean: clean truth data (T, L, A, R)
-        predictions_dict: dict mapping optimizer name → predicted data (T, L, A, R)
+        predictions_dict: dict mapping optimizer name to predicted data (T, L, A, R)
         compartment_name: which compartment to plot (used in title)
         current_T: time horizon
         timesteps_per_day: temporal resolution
@@ -308,10 +301,10 @@ def plot_compartment_timeseries(
 
 def plot_loss_component_breakdown(results_dict: Dict, stage_name: str = "Stage 1", save_path: str = None, prefix: str = ""):
     """
-    Stacked bar chart showing loss component breakdown (NEW)
+    Stacked bar chart showing loss component breakdown
     
     Args:
-        results_dict: dict mapping optimizer name → result dict with 'pure_fit_sse' and 'reg_breakdown'
+        results_dict: dict mapping optimizer name to result dict with 'pure_fit_sse' and 'reg_breakdown'
         stage_name: "Stage 1" or "Stage 2"
         save_path: optional save path
     """
