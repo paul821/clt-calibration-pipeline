@@ -195,7 +195,7 @@ clt-calibration-pipeline/
 ### Time Stretching
 ```python
 config.apply_time_stretch = True
-config.time_stretch_factor = 5.0  # Professor's default
+config.time_stretch_factor = 5.0 
 ```
 
 Elongates epidemic dynamics by dividing transition rates.
