@@ -32,7 +32,7 @@ A modular, multi-optimizer calibration framework for the CLT_BaseModel with supp
 
 ## Installation
 ```bash
-git clone https://github.com/yourusername/clt-calibration-pipeline.git
+git clone https://github.com/paul821/clt-calibration-pipeline.git
 cd clt-calibration-pipeline
 pip install -e .
 ```
