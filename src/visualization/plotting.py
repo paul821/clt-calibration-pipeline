@@ -50,13 +50,19 @@ def save_regional_aggregate_plot(truth_noisy, truth_clean, opt_pred, current_T, 
     tru_agg = truth_clean.sum(dim=(2, 3)).detach().cpu().numpy()
     est_agg = opt_pred.sum(dim=(2, 3)).detach().cpu().numpy()
     
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-    axes = axes.flatten()
-    loc_names = ["Loc A", "Loc B", "Loc C", "Global"]
+    num_locs = obs_agg.shape[1]
+    # Calculate grid size (e.g., ceilings)
+    n_plots = num_locs + 1
+    n_cols = 2
+    n_rows = (n_plots + 1) // 2
     
-    for i in range(4):
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(12, 5 * n_rows))
+    axes = axes.flatten()
+    loc_names = ["Loc A", "Loc B", "Loc C", "Loc D", "Loc E"][:num_locs] + ["Global"]
+    
+    for i in range(n_plots):
         ax = axes[i]
-        if i < 3:
+        if i < num_locs:
             o, t, e = obs_agg[:, i], tru_agg[:, i], est_agg[:, i]
         else:
             o, t, e = obs_agg.sum(axis=1), tru_agg.sum(axis=1), est_agg.sum(axis=1)
@@ -75,6 +81,10 @@ def save_regional_aggregate_plot(truth_noisy, truth_clean, opt_pred, current_T, 
         
         if i == 0:
             ax.legend(loc='upper right', bbox_to_anchor=(0.95, 0.85))
+            
+    # Hide unused subplots
+    for j in range(n_plots, len(axes)):
+        axes[j].set_visible(False)
         
     plt.tight_layout()
     plt.savefig(filename)
@@ -93,8 +103,11 @@ def save_diagnostic_plots(truth_noisy, truth_clean, opt_pred, current_T, age_lab
     
     t_days = np.arange(current_T)
     obs_np, tru_np, est_np = [x.detach().cpu().numpy().squeeze(-1) for x in [truth_noisy, truth_clean, opt_pred]]
-    fig1, axes1 = plt.subplots(5, 3, figsize=(15, 20), sharex=True)
-    for r_idx, r_name in enumerate(["Loc A", "Loc B", "Loc C"]):
+    num_locs = obs_np.shape[1]
+    loc_names = ["Loc A", "Loc B", "Loc C", "Loc D", "Loc E"][:num_locs]
+    
+    fig1, axes1 = plt.subplots(5, num_locs, figsize=(5 * num_locs, 20), sharex=True, squeeze=False)
+    for r_idx, r_name in enumerate(loc_names):
         for a_idx in range(5):
             ax = axes1[a_idx, r_idx]
             obs, tru, est = obs_np[:, r_idx, a_idx], tru_np[:, r_idx, a_idx], est_np[:, r_idx, a_idx]

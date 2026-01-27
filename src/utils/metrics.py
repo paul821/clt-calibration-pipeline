@@ -33,7 +33,10 @@ def format_iter_report(pred, truth, subpop_truths, iteration_count, g_norm=None,
     if sse_obj is not None: 
         print(f"         SSE SUM (Objective): {sse_obj:.3f}")
     
-    for i, name in enumerate(['A', 'B', 'C']):
+    num_locs = pred.shape[1]
+    loc_names = ["A", "B", "C", "D", "E"][:num_locs]
+    
+    for i, name in enumerate(loc_names):
         p_sub, t_sub = pred[:, i].sum(dim=(1, 2)), subpop_truths[i]
         s_sse = torch.sum((p_sub - t_sub) ** 2).item()
         s_ss_tot = torch.sum((t_sub - torch.mean(t_sub)) ** 2).item()
@@ -50,7 +53,7 @@ def print_beta_e0_table(true_betas, opt_betas, true_e0, opt_e0, best_probe_detai
     print("="*105)
     print(f"{'LOCATION':<12} | {'AGE':<6} | {'TRUE E0':<12} | {'OPT E0':<12} | {'BETA (TRUE)':<12} | {'BETA (OPT)':<12} | {'% DEV':<8}")
     print("-" * 105)
-    loc_names = ["Loc A", "Loc B", "Loc C"]
+    loc_names = ["Loc A", "Loc B", "Loc C", "Loc D", "Loc E"][:len(true_betas)]
     for r_idx, name in enumerate(loc_names):
         t_b, o_b = true_betas[r_idx], opt_betas[r_idx]
         b_dev = ((o_b - t_b) / t_b) * 100
@@ -65,7 +68,8 @@ def print_beta_e0_table(true_betas, opt_betas, true_e0, opt_e0, best_probe_detai
         print("-" * 105)
     if best_probe_details:
         print(f"FIT QUALITY AT OPTIMAL OFFSET ({best_probe_details['offset']} days):")
-        for r_idx, name in enumerate(["A", "B", "C"]):
+        loc_names = ["A", "B", "C", "D", "E"][:len(true_betas)]
+        for r_idx, name in enumerate(loc_names):
             print(f"  Subpop {name}: SSE = {best_probe_details['reg_sse'][r_idx]:.3f}, R2 = {best_probe_details['reg_r2'][r_idx]:.5f}")
         print(f"  GLOBAL RESULTS | SSE SUM (Objective): {best_probe_details['loss']:.3f} | Global R2: {best_probe_details['global_r2']:.6f}")
         print(f"  SSE SUM = {best_probe_details['pure_fit_sse']:.3f} (SSE) + {best_probe_details.get('total_reg', 0.0):.3f} (regularization)")
@@ -94,7 +98,9 @@ def print_multi_compartment_table(true_params, opt_params, compartments, best_de
         true_beta = true_params.get("beta", np.zeros(3))
         opt_beta = opt_params.get("beta", np.zeros(3))
         
-        for i, loc_name in enumerate(["Loc A", "Loc B", "Loc C"]):
+        loc_names = ["Loc A", "Loc B", "Loc C", "Loc D", "Loc E"][:len(true_beta)]
+        
+        for i, loc_name in enumerate(loc_names):
             t_val = true_beta[i] if i < len(true_beta) else 0.0
             o_val = opt_beta[i] if i < len(opt_beta) else 0.0
             dev = ((o_val - t_val) / t_val * 100) if t_val != 0 else 0.0
@@ -117,7 +123,9 @@ def print_multi_compartment_table(true_params, opt_params, compartments, best_de
         if opt_comp.ndim == 2:
             opt_comp = opt_comp[..., np.newaxis]
         
-        for r_idx, loc_name in enumerate(["Loc A", "Loc B", "Loc C"]):
+        loc_names = ["Loc A", "Loc B", "Loc C", "Loc D", "Loc E"][:true_comp.shape[0]]
+        
+        for r_idx, loc_name in enumerate(loc_names):
             for a_idx in range(5):
                 t_val = true_comp[r_idx, a_idx, 0] if r_idx < true_comp.shape[0] and a_idx < true_comp.shape[1] else 0.0
                 o_val = opt_comp[r_idx, a_idx, 0] if r_idx < opt_comp.shape[0] and a_idx < opt_comp.shape[1] else 0.0
@@ -168,7 +176,10 @@ def print_results_table(label, true_ihrs, opt_ihrs, truth_data, pred_data):
     else:
         is_per_location = False
     
-    for r_idx, r_name in enumerate(["A", "B", "C"]):
+    num_locs = truth_data.shape[1]
+    loc_names = ["A", "B", "C", "D", "E"][:num_locs]
+    
+    for r_idx, r_name in enumerate(loc_names):
         sub_sse = 0
         for a_idx in range(5):
             t_val = true_ihrs[r_idx, a_idx, 0]

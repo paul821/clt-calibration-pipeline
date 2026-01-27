@@ -8,6 +8,7 @@ import time as global_time
 from ..utils.theta_transforms import build_multi_optimizer_theta_structure, apply_multi_optimizer_theta
 from ..loss.regional_loss import RegionalLossFunction
 from ..loss.regularization import build_regularization_terms
+from ..utils.simulation_utils import apply_time_stretching
 
 class MultiOptimizerStage1:
     """
@@ -70,9 +71,13 @@ class MultiOptimizerStage1:
                 theta = torch.from_numpy(x_np).to(torch.float64)
                 theta = torch.clamp(theta, min=-15.0, max=15.0)
                 theta = theta.detach().requires_grad_(True)
-                init_s, par = apply_multi_optimizer_theta(
+                init_s, par, time_stretch = apply_multi_optimizer_theta(
                     theta, self.estimation_config, struct, base_state, base_params, self.scale_factors
                 )
+                
+                # Apply time stretching if estimated
+                if self.config.estimate_time_stretch:
+                    par = apply_time_stretching(par, time_stretch)
                 
                 inputs = metapop_handle.get_flu_torch_inputs()
                 pred = flu.torch_simulate_hospital_admits(

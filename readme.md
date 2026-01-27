@@ -116,6 +116,9 @@ python examples/ihr_mode_example.py
 
 # Multi-compartment
 python examples/multi_compartment_example.py
+
+# Two-Region Austin (Time Stretch Estimation)
+python examples/austin_2region_tester.py
 ```
 
 ## Configuration Guide
@@ -195,10 +198,12 @@ clt-calibration-pipeline/
 ### Time Stretching
 ```python
 config.apply_time_stretch = True
-config.time_stretch_factor = 5.0 
+config.time_stretch_factor = 1.1 
+config.estimate_time_stretch = True  # Enable optimization
+config.time_stretch_bounds = (0.5, 2.0)
 ```
 
-Elongates epidemic dynamics by dividing transition rates.
+Elongates epidemic dynamics by dividing transition rates (1.0 = no stretch, >1.0 = slower dynamics). Can be estimated as a free parameter during calibration.
 
 ### Custom Regularization
 ```python

@@ -35,7 +35,12 @@ def build_gss_theta_structure(config, base_state, base_params):
         slices[f"init_{comp_name}"] = slice(idx, idx + n_comp)
         idx += n_comp
     
-    return {"slices": slices, "size": idx, "beta_param": config["beta_param"]}
+    # Time stretch
+    if config.get("estimate_time_stretch", False):
+        slices["time_stretch"] = slice(idx, idx + 1)
+        idx += 1
+    
+    return {"slices": slices, "size": idx, "beta_param": config["beta_param"], "estimate_time_stretch": config.get("estimate_time_stretch", False)}
 
 def apply_gss_theta(theta, config, structure, base_state, base_params, scale_factors):
     """
@@ -88,7 +93,16 @@ def apply_gss_theta(theta, config, structure, base_state, base_params, scale_fac
         comp_vals = (torch.exp(theta_comp) / comp_scale).view_as(getattr(init_state, comp_name))
         setattr(init_state, comp_name, comp_vals.double())
     
-    return init_state, params
+    # Time stretch
+    if structure.get("estimate_time_stretch", False):
+        s_ts = slices["time_stretch"]
+        theta_ts = theta[s_ts]
+        # theta stores log(time_stretch)
+        # Note: we don't scale time_stretch currently as it's close to 1.0
+        time_stretch = torch.exp(theta_ts)
+        return init_state, params, time_stretch.item()
+    
+    return init_state, params, 1.0
 
 def apply_ihr_theta(theta, base_params, scale_factors):
     """
@@ -173,11 +187,19 @@ def build_multi_optimizer_theta_structure(config, base_state, base_params):
         slices[f"init_{comp_name}"] = slice(idx, idx + n_comp)
         idx += n_comp
     
+        idx += n_comp
+    
+    # Time stretch
+    if config.get("estimate_time_stretch", False):
+        slices["time_stretch"] = slice(idx, idx + 1)
+        idx += 1
+    
     return {
         "slices": slices,
         "size": idx,
         "beta_param": config.get("beta_param", "L"),
-        "ihr_param": config.get("ihr_param", "L") if estimate_ihr else None
+        "ihr_param": config.get("ihr_param", "L") if estimate_ihr else None,
+        "estimate_time_stretch": config.get("estimate_time_stretch", False)
     }
     
 def apply_multi_optimizer_theta(theta, config, structure, base_state, base_params, scale_factors):
@@ -252,4 +274,12 @@ def apply_multi_optimizer_theta(theta, config, structure, base_state, base_param
         comp_vals = (torch.exp(theta_comp) / comp_scale).view(L, A, R)
         setattr(init_state, comp_name, comp_vals.double())
     
-    return init_state, params
+
+    # Time stretch
+    if structure.get("estimate_time_stretch", False):
+        s_ts = slices["time_stretch"]
+        theta_ts = theta[s_ts]
+        time_stretch = torch.exp(theta_ts)
+        return init_state, params, time_stretch.item()
+
+    return init_state, params, 1.0

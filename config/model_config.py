@@ -9,6 +9,7 @@ class ModelConfig:
     # Paths
     texas_input_path: Optional[Path] = None
     calibration_input_path: Optional[Path] = None
+    mixing_file: str = "ABC_mixing_params.json"
     
     timesteps_per_day: int = 4
     

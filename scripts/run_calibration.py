@@ -52,22 +52,13 @@ from src.visualization.reports import (
     generate_full_calibration_report
 )
 
+from src.utils.simulation_utils import apply_time_stretching
+
 def get_output_prefix(config):
     """Get output prefix for filenames"""
     return config.output_prefix if config.output_prefix else f"{config.mode}_"
 
-def apply_time_stretching(params, time_stretch_factor):
-    """
-    Apply time stretching to transition rates
-    
-    Divides all transition rates by time_stretch_factor to potentially elongate epidemic dynamics
-    """
-    stretched_params = clt.updated_dataclass(params, {
-        attr: getattr(params, attr) / time_stretch_factor
-        for attr in ['E_to_I_rate', 'IP_to_IS_rate', 'ISR_to_R_rate', 'IA_to_R_rate', 
-                     'ISH_to_H_rate', 'HR_to_R_rate', 'HD_to_D_rate', 'R_to_S_rate']
-    })
-    return stretched_params
+
 
 def load_model_components(model_config: ModelConfig, calib_config: CalibrationConfig):
     """
@@ -81,7 +72,8 @@ def load_model_components(model_config: ModelConfig, calib_config: CalibrationCo
     s_info = flu.FluSubpopSchedules(
         absolute_humidity=pd.read_csv(t_path / "absolute_humidity_austin_2023_2024.csv", index_col=0),
         flu_contact_matrix=pd.read_csv(t_path / "school_work_calendar.csv", index_col=0),
-        daily_vaccines=pd.read_csv(t_path / "daily_vaccines_constant.csv", index_col=0)
+        daily_vaccines=pd.read_csv(t_path / "daily_vaccines_constant.csv", index_col=0),
+        mobility_modifier=pd.read_csv(t_path / "mobility_modifier.csv", index_col=0)
     )
     
     # Params with optional time stretching
@@ -102,7 +94,8 @@ def load_model_components(model_config: ModelConfig, calib_config: CalibrationCo
         init = clt.make_dataclass_from_json(c_path / f"{name}_init_vals.json", flu.FluSubpopState)
         
         # Set initial seeding
-        new_e = torch.zeros_like(torch.as_tensor(init.E)).double()
+        # Set initial seeding
+        new_e = np.zeros_like(init.E, dtype=float)
         if i == model_config.seed_region_idx:
             new_e[model_config.seed_age_idx] = model_config.seed_value
         init.E = new_e
@@ -112,7 +105,11 @@ def load_model_components(model_config: ModelConfig, calib_config: CalibrationCo
             clt.updated_dataclass(s_params, {"beta_baseline": bt}), 
             clt.updated_dataclass(
                 clt.make_dataclass_from_json(t_path / "simulation_settings.json", flu.SimulationSettings),
-                {"timesteps_per_day": model_config.timesteps_per_day}
+                {
+                    "timesteps_per_day": model_config.timesteps_per_day,
+                    "use_deterministic_softplus": False,
+                    "transition_type": "binom_deterministic_no_round"
+                }
             ),
             np.random.default_rng(),
             s_info,
@@ -122,7 +119,7 @@ def load_model_components(model_config: ModelConfig, calib_config: CalibrationCo
     # Metapopulation
     metapop = flu.FluMetapopModel(
         subpops,
-        clt.make_dataclass_from_json(c_path / "ABC_mixing_params.json", flu.FluMixingParams)
+        clt.make_dataclass_from_json(c_path / model_config.mixing_file, flu.FluMixingParams)
     )
     
     return metapop
@@ -461,7 +458,7 @@ def run_multi_optimizer_mode(
     # Generate predictions
     stage1_predictions = {}
     for opt_name, result in best_per_opt_s1.items():
-        opt_state, opt_params = apply_multi_optimizer_theta(
+        opt_state, opt_params, opt_ts = apply_multi_optimizer_theta(
             torch.from_numpy(result['theta_opt']),
             calib_config.estimation_config,
             struct,
@@ -469,6 +466,11 @@ def run_multi_optimizer_mode(
             d["params_tensors"],
             model_config.scale_factors
         )
+        
+        if calib_config.estimate_time_stretch:
+            opt_params = apply_time_stretching(opt_params, opt_ts)
+        elif calib_config.apply_time_stretch:
+            opt_params = apply_time_stretching(opt_params, calib_config.time_stretch_factor)
         
         with torch.no_grad():
             inputs = metapop.get_flu_torch_inputs()

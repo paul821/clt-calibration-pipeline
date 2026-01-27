@@ -45,8 +45,11 @@ class CalibrationConfig:
     # "location_age": sum of per-(location,age) SSE (Stage 2 style)
     # "global": single global SSE (legacy)
     
-    time_stretch_factor: float = 1.0  
+    # Time stretch estimation
     apply_time_stretch: bool = False
+    time_stretch_factor: float = 1.0  
+    estimate_time_stretch: bool = False  
+    time_stretch_bounds: tuple = (0.5, 2.0)
     
     # Noise injection for robustness testing
     noise_type: str = "none"  # "none", "poisson", "gaussian"
