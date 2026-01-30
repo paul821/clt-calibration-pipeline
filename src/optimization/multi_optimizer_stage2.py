@@ -15,7 +15,6 @@ class MultiOptimizerStage2:
     
     Used when Stage 1 beta/initial compartments are already fixed.
     
-    Features:
     - Multiple optimizers run in parallel or sequentially
     - Restart strategy (Wide/Medium/Narrow) with tighter bounds for IHR
     - Location-age loss aggregation (15-channel)
