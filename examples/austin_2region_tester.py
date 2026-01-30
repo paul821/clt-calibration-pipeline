@@ -1,4 +1,3 @@
-# Example: Two-region Austin calibration with Time Stretch estimation
 
 import sys
 from pathlib import Path
@@ -56,7 +55,7 @@ def main():
             compartment_configs={
                 "E": {
                     "type": "structural",
-                    "location_targets": [0.0, 1.0],  # 2 regions now!
+                    "location_targets": [0.0, 1.0],  # 2 regions 
                     "age_targets": [0, 0, 1, 0, 0],
                     "lambda_on_target": 100000.0,  
                     "lambda_off_target": 100000.0  
@@ -82,9 +81,6 @@ def main():
         print("="*100)
         
         # Run calibration
-        # Note: We might hit an error with mixing params if we don't fix the JSON.
-        # Let's hope the user has a 2-region file or we mock it.
-        # Actually, let's create a temporary 2-region mixing file to be robust.
         
         import json
         p_root = Path(__file__).parent.parent
@@ -102,19 +98,6 @@ def main():
             }
             with open(ab_mixing_file, 'w') as f:
                 json.dump(ab_mixing, f)
-        
-        # Hack run_calibration to load this file? 
-        # run_calibration hardcodes "ABC_mixing_params.json".
-        # We should update run_calibration to accept mixing file name in ModelConfig.
-        
-        # NOTE: Since we didn't update run_calibration to allow custom mixing file name,
-        # we will monkey-patch or just update run_calibration in the next step if this fails.
-        # But wait, looking at run_calibration.py:
-        # metapop = flu.FluMetapopModel(subpops, clt.make_dataclass_from_json(c_path / "ABC_mixing_params.json", ...))
-        # It is HARDCODED.
-        
-        # I should probably update run_calibration.py to allow custom mixing file.
-        # But for now, let's stick to the prompt.
         
         stage1_results, _ = run_calibration(calib_config, model_config)
         
