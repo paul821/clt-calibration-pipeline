@@ -23,7 +23,7 @@ class IHROptimizer:
         self.timesteps_per_day = config.timesteps_per_day
         self.optimizers = config.optimizers if hasattr(config, 'optimizers') else ["L-BFGS-B"]
     
-    def run(self, truth_15ch, state_t0, params_in, metapop, current_T):
+    def run(self, truth_15ch, state_t0, params_in, metapop, current_T, time_stretch_factor=1.0):
         """
         Run IHR optimization with multiple optimizers
         
@@ -91,7 +91,8 @@ class IHROptimizer:
                     inputs["precomputed"], 
                     inputs["schedule_tensors"],
                     current_T, 
-                    self.timesteps_per_day
+                    self.timesteps_per_day,
+                    time_stretch_factor=time_stretch_factor
                 )
                 
                 # Compute MSE loss
@@ -191,7 +192,7 @@ class IHROptimizer:
                 inputs = metapop.get_flu_torch_inputs()
                 final_pred = flu.torch_simulate_hospital_admits(
                     state_t0, final_params, inputs["precomputed"], inputs["schedule_tensors"],
-                    current_T, self.timesteps_per_day
+                    current_T, self.timesteps_per_day, time_stretch_factor=time_stretch_factor
                 )
                 
                 final_components = loss_fn_obj(final_pred, truth_15ch)

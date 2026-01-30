@@ -100,7 +100,7 @@ def apply_gss_theta(theta, config, structure, base_state, base_params, scale_fac
         # theta stores log(time_stretch)
         # Note: we don't scale time_stretch currently as it's close to 1.0
         time_stretch = torch.exp(theta_ts)
-        return init_state, params, time_stretch.item()
+        return init_state, params, time_stretch
     
     return init_state, params, 1.0
 
@@ -280,6 +280,6 @@ def apply_multi_optimizer_theta(theta, config, structure, base_state, base_param
         s_ts = slices["time_stretch"]
         theta_ts = theta[s_ts]
         time_stretch = torch.exp(theta_ts)
-        return init_state, params, time_stretch.item()
+        return init_state, params, time_stretch
 
     return init_state, params, 1.0

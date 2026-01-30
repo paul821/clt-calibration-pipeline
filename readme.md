@@ -108,5 +108,6 @@ Confirm the functionality by running the included examples:
 1.  **`examples/basic_calibration.py`**: Runs a simple `BETA_ONLY` fit on synthetic data. Verifies the pipeline can recover a known $\beta$.
 2.  **`examples/ihr_mode_example.py`**: Runs the full 2-stage `IHR_MODE` with GSS. Verifies that the pipeline can align time-shifted data and recover age-specific rates.
 3.  **`examples/austin_2region_tester.py`**: Runs a simulation on a 2-node "Austin-like" network with Time Stretch. Verifies the model can recover a time stretch factor of 1.1.
+4.  **`examples/multi_compartment_example.py`**: Demonstrates calibration of multiple initial compartments (e.g., $E_0$, $I_{P,0}$) simultaneously.
 
 Next Step: Apply the pipeline to real-world NSSP ED data.

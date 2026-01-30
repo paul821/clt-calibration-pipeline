@@ -143,12 +143,12 @@ class GSSOptimizer:
                 theta = torch.from_numpy(x_np).to(torch.float64)
                 theta = torch.clamp(theta, min=-15.0, max=15.0)
                 theta = theta.detach().requires_grad_(True)
-                init_s, par = apply_gss_theta(theta, self.estimation_config, struct, base_state, base_params, self.scale_factors)
+                init_s, par, ts = apply_gss_theta(theta, self.estimation_config, struct, base_state, base_params, self.scale_factors)
                 
                 inputs = metapop_handle.get_flu_torch_inputs()
                 pred = flu.torch_simulate_hospital_admits(
                     init_s, par, inputs["precomputed"], inputs["schedule_tensors"], 
-                    current_T, self.timesteps_per_day
+                    current_T, self.timesteps_per_day, time_stretch_factor=ts
                 )
                 
                 # Compute regularization
@@ -315,11 +315,11 @@ class GSSOptimizer:
             # Evaluate final solution
             with torch.no_grad():
                 theta_final = torch.from_numpy(res.x)
-                init_s, par = apply_gss_theta(theta_final, self.estimation_config, struct, base_state, base_params, self.scale_factors)
+                init_s, par, ts = apply_gss_theta(theta_final, self.estimation_config, struct, base_state, base_params, self.scale_factors)
                 inputs = metapop_handle.get_flu_torch_inputs()
                 final_p = flu.torch_simulate_hospital_admits(
                     init_s, par, inputs["precomputed"], inputs["schedule_tensors"],
-                    current_T, self.timesteps_per_day
+                    current_T, self.timesteps_per_day, time_stretch_factor=ts
                 )
                 
                 final_components = loss_fn_obj(final_p, shifted)

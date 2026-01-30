@@ -29,7 +29,7 @@ class MultiOptimizerStage2:
         self.optimizers = config.optimizers
         self.ihr_param = config.estimation_config.get("ihr_param", "L")
     
-    def run(self, truth_15ch, state_t0, params_fixed_beta, metapop, current_T):
+    def run(self, truth_15ch, state_t0, params_fixed_beta, metapop, current_T, time_stretch_factor=1.0):
         """
         Run multi-optimizer IHR calibration suite
         
@@ -39,10 +39,7 @@ class MultiOptimizerStage2:
             params_fixed_beta: params with beta fixed from Stage 1
             metapop: metapopulation model
             current_T: simulation time horizon
-        
-        Returns:
-            results_df: pandas DataFrame with all attempts
-            best_per_optimizer: dict mapping optimizer name → best result
+            time_stretch_factor: time stretch from Stage 1 (default 1.0)
         """
         import flu_core as flu
         import clt_toolkit as clt
@@ -89,7 +86,7 @@ class MultiOptimizerStage2:
                 inputs = metapop.get_flu_torch_inputs()
                 pred = flu.torch_simulate_hospital_admits(
                     state_t0, par, inputs["precomputed"], inputs["schedule_tensors"],
-                    current_T, self.timesteps_per_day
+                    current_T, self.timesteps_per_day, time_stretch_factor=time_stretch_factor
                 )
                 
                 # Location-age loss

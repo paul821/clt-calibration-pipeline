@@ -75,14 +75,13 @@ class MultiOptimizerStage1:
                     theta, self.estimation_config, struct, base_state, base_params, self.scale_factors
                 )
                 
-                # Apply time stretching if estimated
-                if self.config.estimate_time_stretch:
-                    par = apply_time_stretching(par, time_stretch)
+                # Apply time stretching via simulation argument
+                # (Note: we no longer modify params directly as that changes R0 if beta isn't scaled)
                 
                 inputs = metapop_handle.get_flu_torch_inputs()
                 pred = flu.torch_simulate_hospital_admits(
                     init_s, par, inputs["precomputed"], inputs["schedule_tensors"],
-                    self.config.T, self.timesteps_per_day
+                    self.config.T, self.timesteps_per_day, time_stretch_factor=time_stretch
                 )
                 
                 # Regularization
@@ -159,6 +158,16 @@ class MultiOptimizerStage1:
                     theta0[s_comp] = np.log((comp0 * jitter) * comp_scale)
                 else:
                     theta0[s_comp] = np.log(np.maximum(comp0, 1e-12) * comp_scale)
+            
+            if "time_stretch" in struct["slices"]:
+                s_ts = struct["slices"]["time_stretch"]
+                if randomize:
+                    # Randomize between 0.8 and 1.25
+                    ts0 = np.random.uniform(0.8, 1.25)
+                    theta0[s_ts] = np.log(ts0)
+                else:
+                    # Start slightly off 1.0 to check gradient? Or just 1.0
+                    theta0[s_ts] = np.log(1.0)
                 
             return theta0
         

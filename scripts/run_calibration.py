@@ -131,13 +131,18 @@ def generate_truth_data(metapop, calib_config: CalibrationConfig, model_config: 
     d = metapop.get_flu_torch_inputs()
     
     with torch.no_grad():
+        ts_factor = 1.0
+        if calib_config.apply_time_stretch:
+            ts_factor = calib_config.time_stretch_factor
+
         clean_truth_15ch = flu.torch_simulate_hospital_admits(
             d["state_tensors"], 
             d["params_tensors"], 
             d["precomputed"], 
             d["schedule_tensors"], 
             calib_config.T, 
-            calib_config.timesteps_per_day
+            calib_config.timesteps_per_day,
+            time_stretch_factor=ts_factor
         )
         
         # Add noise if requested
@@ -219,7 +224,7 @@ def run_ihr_mode(
     best_offset = best_result_s1['offset']
     best_T = best_result_s1['T']
     
-    final_state_s1, final_params_s1 = apply_gss_theta(
+    final_state_s1, final_params_s1, best_ts_s1 = apply_gss_theta(
         torch.from_numpy(best_result_s1['theta_opt']),
         calib_config.estimation_config,
         struct,
@@ -242,7 +247,7 @@ def run_ihr_mode(
     for opt_name, result in stage1_results.items():
         opt_offset = result['offset']
         opt_T = result['T']
-        opt_state, opt_params = apply_gss_theta(
+        opt_state, opt_params, opt_ts = apply_gss_theta(
             torch.from_numpy(result['theta_opt']),
             calib_config.estimation_config,
             struct,
@@ -262,7 +267,7 @@ def run_ihr_mode(
             inputs = metapop.get_flu_torch_inputs()
             stage1_predictions[opt_name] = flu.torch_simulate_hospital_admits(
                 opt_state, opt_params, inputs["precomputed"], inputs["schedule_tensors"],
-                opt_T, calib_config.timesteps_per_day
+                opt_T, calib_config.timesteps_per_day, time_stretch_factor=opt_ts
             )
     
     # Extract true parameters for reporting
@@ -327,7 +332,8 @@ def run_ihr_mode(
         final_state_s1,
         final_params_s1,
         metapop,
-        best_T
+        best_T,
+        time_stretch_factor=best_ts_s1
     )
     
     # Print Stage 2 comparison
@@ -362,7 +368,7 @@ def run_ihr_mode(
             inputs = metapop.get_flu_torch_inputs()
             stage2_predictions[opt_name] = flu.torch_simulate_hospital_admits(
                 final_state_s1, opt_params, inputs["precomputed"], inputs["schedule_tensors"],
-                best_T, calib_config.timesteps_per_day
+                best_T, calib_config.timesteps_per_day, time_stretch_factor=best_ts_s1
             )
     
     # Generate Stage 2 report
@@ -467,16 +473,18 @@ def run_multi_optimizer_mode(
             model_config.scale_factors
         )
         
+        # Prepare time stretch factor
+        ts_factor = 1.0
         if calib_config.estimate_time_stretch:
-            opt_params = apply_time_stretching(opt_params, opt_ts)
+            ts_factor = opt_ts
         elif calib_config.apply_time_stretch:
-            opt_params = apply_time_stretching(opt_params, calib_config.time_stretch_factor)
+            ts_factor = calib_config.time_stretch_factor
         
         with torch.no_grad():
             inputs = metapop.get_flu_torch_inputs()
             stage1_predictions[opt_name] = flu.torch_simulate_hospital_admits(
                 opt_state, opt_params, inputs["precomputed"], inputs["schedule_tensors"],
-                calib_config.T, calib_config.timesteps_per_day
+                calib_config.T, calib_config.timesteps_per_day, time_stretch_factor=ts_factor
             )
     
     # Extract true parameters
@@ -526,7 +534,7 @@ def run_multi_optimizer_mode(
         print("\n### STAGE 2: INFECTION-HOSPITALIZATION RATE ###")
         
         # Use best Stage 1 result as starting point
-        best_state_s1, best_params_s1 = apply_multi_optimizer_theta(
+        best_state_s1, best_params_s1, best_ts_s1 = apply_multi_optimizer_theta(
             torch.from_numpy(best_s1[1]['theta_opt']),
             calib_config.estimation_config,
             struct,
@@ -540,12 +548,20 @@ def run_multi_optimizer_mode(
             model_config.scale_factors
         )
         
+        # Prepare TS factor
+        s2_ts_factor = 1.0
+        if calib_config.estimate_time_stretch:
+            s2_ts_factor = best_ts_s1
+        elif calib_config.apply_time_stretch:
+            s2_ts_factor = calib_config.time_stretch_factor
+
         results_df_s2, best_per_opt_s2 = multi_opt_s2.run(
             truth_data_15ch,
             best_state_s1,
             best_params_s1,
             metapop,
-            calib_config.T
+            calib_config.T,
+            time_stretch_factor=s2_ts_factor
         )
         
         # Print comparison
@@ -572,7 +588,7 @@ def run_multi_optimizer_mode(
                 inputs = metapop.get_flu_torch_inputs()
                 stage2_predictions[opt_name] = flu.torch_simulate_hospital_admits(
                     best_state_s1, opt_params, inputs["precomputed"], inputs["schedule_tensors"],
-                    calib_config.T, calib_config.timesteps_per_day
+                    calib_config.T, calib_config.timesteps_per_day, time_stretch_factor=s2_ts_factor
                 )
         
         # Generate report
