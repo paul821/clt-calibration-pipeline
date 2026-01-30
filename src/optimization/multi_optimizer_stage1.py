@@ -16,7 +16,6 @@ class MultiOptimizerStage1:
     
     Used for non-IHR modes: BETA_ONLY, or beta + initial compartments
     
-    Features:
     - Multiple optimizers run in parallel or sequentially
     - Restart strategy (Wide/Medium/Narrow)
     - Regional loss decomposition
@@ -76,7 +75,6 @@ class MultiOptimizerStage1:
                 )
                 
                 # Apply time stretching via simulation argument
-                # (Note: we no longer modify params directly as that changes R0 if beta isn't scaled)
                 
                 inputs = metapop_handle.get_flu_torch_inputs()
                 pred = flu.torch_simulate_hospital_admits(
